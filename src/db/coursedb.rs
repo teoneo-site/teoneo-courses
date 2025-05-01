@@ -1,6 +1,5 @@
 use sqlx::MySqlPool;
 use sqlx::Row;
-use tokio_util::bytes::BufMut;
 
 use crate::controllers::course::CourseInfo;
 

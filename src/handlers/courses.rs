@@ -1,4 +1,3 @@
-use anyhow::anyhow;
 use axum::{
     extract::{Path, State},
     http::{header::CONTENT_TYPE, HeaderMap, HeaderValue, StatusCode},
@@ -7,7 +6,10 @@ use axum::{
 use serde_json::json;
 use sqlx::MySqlPool;
 
-use crate::{controllers, handlers};
+use crate::{
+    controllers,
+    handlers::{self, ErrorTypes},
+};
 
 // PUBLIC GET /courses - Get a list of all available courses (for main page)
 pub async fn get_all_courses(State(state): State<MySqlPool>) -> Result<Response, Response> {
@@ -31,8 +33,8 @@ pub async fn get_all_courses(State(state): State<MySqlPool>) -> Result<Response,
                 StatusCode::BAD_REQUEST,
                 headers,
                 serde_json::to_string_pretty(&handlers::ErrorResponse::new(
-                    "server_error",
-                    "Could not connect to the database",
+                    &ErrorTypes::InternalError.to_string(),
+                    "Could not fetch courses",
                 ))
                 .unwrap(), // Should not panic, because struct is always valid for converting into JSON
             )
@@ -65,8 +67,8 @@ pub async fn get_course(
                 StatusCode::BAD_REQUEST,
                 headers,
                 serde_json::to_string_pretty(&handlers::ErrorResponse::new(
-                    "server_error",
-                    "Could not connect to the database",
+                    &ErrorTypes::InternalError.to_string(),
+                    "Could not fetch the course",
                 ))
                 .unwrap(), // Should not panic, because struct is always valid for converting into JSON
             )
