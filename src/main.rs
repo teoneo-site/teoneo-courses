@@ -4,6 +4,7 @@ use axum::Router;
 use sqlx::mysql::MySqlPoolOptions;
 use tower_http::cors::CorsLayer;
 
+mod common;
 mod controllers;
 mod db;
 mod handlers;
@@ -25,6 +26,8 @@ async fn main() {
     let app = Router::new()
         .route("/courses", axum::routing::get(handlers::courses::get_all_courses))
         .route("/courses/{course_id}", axum::routing::get(handlers::courses::get_course))
+        .route("/courses/{course_id}/modules", axum::routing::get(handlers::modules::get_modules_for_course))
+        .route("/courses/{course_id}/modules/{module_id}", axum::routing::get(handlers::modules::get_module))
         .layer(CorsLayer::permissive().allow_origin(tower_http::cors::Any))
         .with_state(mysql_pool);
 

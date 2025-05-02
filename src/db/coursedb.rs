@@ -21,13 +21,7 @@ pub async fn fetch_courses(pool: &MySqlPool) -> anyhow::Result<Vec<CourseInfo>> 
             .collect::<Vec<String>>(); // tags are stored like "python,ai,cock" we transform it into ["py...", "ai", "cock"]
 
         let picture_url: String = row.try_get(4)?;
-        result.push(CourseInfo::new(
-            id,
-            &title,
-            &description,
-            tags,
-            &picture_url,
-        ));
+        result.push(CourseInfo::new(id, title, description, tags, picture_url));
     }
 
     Ok(result)
@@ -48,11 +42,5 @@ pub async fn fetch_course(pool: &MySqlPool, id: i32) -> anyhow::Result<CourseInf
         .collect::<Vec<String>>(); // tags are stored like "python,ai,cock" we transform it into ["py...", "ai", "cock"]
     let picture_url: String = row.try_get("picture_url")?;
 
-    Ok(CourseInfo::new(
-        id,
-        &title,
-        &description,
-        tags,
-        &picture_url,
-    ))
+    Ok(CourseInfo::new(id, title, description, tags, picture_url))
 }

@@ -15,17 +15,17 @@ pub struct CourseInfo {
 impl CourseInfo {
     pub fn new(
         id: i32,
-        title: &str,
-        description: &str,
+        title: String,
+        description: String,
         tags: Vec<String>,
-        picture_url: &str,
+        picture_url: String,
     ) -> Self {
         Self {
             id,
-            title: title.to_owned(),
-            description: description.to_owned(),
+            title,
+            description,
             tags,
-            picture_url: picture_url.to_owned(),
+            picture_url,
         }
     }
 }
