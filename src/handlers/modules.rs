@@ -74,21 +74,11 @@ pub async fn get_module(
     let is_subscribed_to_course = match common::token::verify_jwt_token(token) {
         Ok(user_id) => {
             // Check ownership TODO: API for verifying ownership of a course
-            false
+            true
         }
         Err(why) => {
-            // true // Temporary!!!!! TODO: Remove
-
             eprintln!("Why: {}", why);
-            return Err((
-                StatusCode::UNAUTHORIZED, // Means refresh jwt token, not exit
-                serde_json::to_string_pretty(&handlers::ErrorResponse::new(
-                    &ErrorTypes::JwtTokenExpired.to_string(),
-                    "Update JWT token on frontend",
-                ))
-                .unwrap(),
-            )
-                .into_response());
+            false // If user isnt logged in its okay, he'll see public part of the module
         }
     };
 
