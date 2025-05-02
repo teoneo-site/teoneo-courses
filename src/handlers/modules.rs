@@ -77,18 +77,18 @@ pub async fn get_module(
             false
         }
         Err(why) => {
-            true // Temporary!!!!! TODO: Remove
+            // true // Temporary!!!!! TODO: Remove
 
-            // eprintln!("Why: {}", why);
-            // return Err((
-            //     StatusCode::UNAUTHORIZED, // Means refresh jwt token, not exit
-            //     serde_json::to_string_pretty(&handlers::ErrorResponse::new(
-            //         &ErrorTypes::JwtTokenExpired.to_string(),
-            //         "Update JWT token on frontend",
-            //     ))
-            //     .unwrap(),
-            // )
-            //     .into_response());
+            eprintln!("Why: {}", why);
+            return Err((
+                StatusCode::UNAUTHORIZED, // Means refresh jwt token, not exit
+                serde_json::to_string_pretty(&handlers::ErrorResponse::new(
+                    &ErrorTypes::JwtTokenExpired.to_string(),
+                    "Update JWT token on frontend",
+                ))
+                .unwrap(),
+            )
+                .into_response());
         }
     };
 
