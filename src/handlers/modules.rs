@@ -73,11 +73,11 @@ pub async fn get_module(
 
     let is_subscribed_to_course = match common::token::verify_jwt_token(token) {
         Ok(user_id) => {
-            // Check ownership
+            // Check ownership TODO: API for verifying ownership of a course
             false
         }
         Err(why) => {
-            true // Temporary!!!!!
+            true // Temporary!!!!! TODO: Remove
 
             // eprintln!("Why: {}", why);
             // return Err((
