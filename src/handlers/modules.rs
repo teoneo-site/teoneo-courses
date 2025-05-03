@@ -90,7 +90,8 @@ pub async fn get_module(
                 })
                 .to_string()
             } else {
-                let mut value: serde_json::Value = serde_json::Value::Object(serde_json::Map::new());
+                let mut value: serde_json::Value =
+                    serde_json::Value::Object(serde_json::Map::new());
                 value["id"] = module_id.into();
                 value["course_id"] = course_id.into();
                 value["title"] = module.title.into();
@@ -98,9 +99,10 @@ pub async fn get_module(
 
                 json!({
                     "data": value
-                }).to_string()
+                })
+                .to_string()
             };
-            
+
             let mut headers = HeaderMap::new();
             headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
             return Ok((StatusCode::OK, headers, body).into_response());

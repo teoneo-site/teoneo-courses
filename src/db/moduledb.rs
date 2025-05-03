@@ -9,7 +9,7 @@ pub async fn fetch_modules_for_course(
 ) -> anyhow::Result<Vec<ModuleInfo>> {
     let rows =
         sqlx::query("SELECT id, title, description, theory, picture_url, video_url FROM modules WHERE course_id = ?")// Todo: Pagination with LIMIT
-            .bind(course_id) 
+            .bind(course_id)
             .fetch_all(pool)
             .await?;
 

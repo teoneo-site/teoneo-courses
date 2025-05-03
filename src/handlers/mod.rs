@@ -2,9 +2,12 @@ use std::fmt::Display;
 
 use serde::{Deserialize, Serialize};
 
+// Types of handlers
 pub mod courses;
 pub mod modules;
+pub mod tasks;
 
+// Errors stuff
 #[derive(Serialize, Deserialize)]
 pub struct ErrorResponse {
     error_type: String,
