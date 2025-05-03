@@ -37,7 +37,7 @@ pub async fn get_modules_for_course(
             return Ok((StatusCode::OK, headers, json.to_string()).into_response());
         }
         Err(why) => {
-            eprintln!("Why: {}", why);
+            eprintln!("Why mo: {}", why);
 
             let mut headers = HeaderMap::new();
             headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
@@ -77,7 +77,7 @@ pub async fn get_module(
             true
         }
         Err(why) => {
-            eprintln!("Why: {}", why);
+            eprintln!("Why mo: {}", why);
             false // If user isnt logged in its okay, he'll see public part of the module
         }
     };
@@ -108,7 +108,7 @@ pub async fn get_module(
             return Ok((StatusCode::OK, headers, body).into_response());
         }
         Err(why) => {
-            eprintln!("Why: {}", why);
+            eprintln!("Why mo: {}", why);
 
             let mut headers = HeaderMap::new();
             headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
