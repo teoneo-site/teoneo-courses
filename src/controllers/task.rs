@@ -61,13 +61,18 @@ pub struct Task {
     pub id: i32,
     pub module_id: i32,
     pub title: String,
-    #[serde(alias = "type")]
     pub task_type: TaskType,
-    pub content: serde_json::Value, // JSON string
+    pub content: serde_json::Value, // содержимое задания
 }
 
 impl Task {
-    pub fn new(id: i32, module_id: i32, title: String, task_type: TaskType, content: serde_json::Value) -> Self {
+    pub fn new(
+        id: i32,
+        module_id: i32,
+        title: String,
+        task_type: TaskType,
+        content: serde_json::Value,
+    ) -> Self {
         Self {
             id,
             module_id,
@@ -83,7 +88,7 @@ pub struct QuizTask {
     pub question: String,
     pub possible_answers: Vec<String>, // divided by ';'
     pub is_multiple: bool,
-    pub answers: Vec<u8>,              // string div by ';'
+    pub answers: Vec<u8>, // string div by ';'
     pub picture_url: String,
 }
 

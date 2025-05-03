@@ -9,7 +9,7 @@ pub async fn fetch_tasks_for_module(
     pool: &MySqlPool,
     module_id: i32,
 ) -> anyhow::Result<Vec<TaskShortInfo>> {
-    let rows = sqlx::query("SELECT id, title, type FROM tasks WHERE id = ?") // Todo: Pagination with LIMIT
+    let rows = sqlx::query("SELECT id, title, type FROM tasks WHERE module_id = ?") // Todo: Pagination with LIMIT
         .bind(module_id)
         .fetch_all(pool)
         .await?;
@@ -28,15 +28,47 @@ pub async fn fetch_tasks_for_module(
 }
 
 pub async fn fetch_task(pool: &MySqlPool, module_id: i32, task_id: i32) -> anyhow::Result<Task> {
-    let row: sqlx::mysql::MySqlRow =
-        sqlx::query("SELECT title, type, content FROM tasks WHERE id = ?")
-            .bind(task_id)
-            .fetch_one(pool)
-            .await?;
+    let row = sqlx::query("SELECT t.title, t.type,
+                                             q.question, q.possible_answers, q.is_multiple,
+                                             l.text, l.picture_url, l.video_url
+                                      FROM tasks t
+                                      LEFT JOIN quizzes q ON t.id = q.task_id AND t.type = 'Quiz'
+                                      LEFT JOIN lectures l ON t.id = l.task_id AND t.type = 'Lecture'
+                                      WHERE t.id = ?")
+        .bind(task_id)
+        .fetch_one(pool)
+        .await?;
 
     let title: String = row.try_get("title")?;
-    let task_type: TaskType = row.try_get::<String, _>("type")?.into();
-    let content = row.try_get::<serde_json::Value, _>("content")?;
+    let task_type_str: String = row.try_get("type")?;
+    let task_type: TaskType = task_type_str.into();
+
+    let content = match task_type {
+        TaskType::Quiz => {
+            let question: String = row.try_get("question")?;
+            let possible_answers: String = row.try_get("possible_answers")?;
+            let is_multiple: bool = row.try_get("is_multiple")?;
+            let picture_url: Option<String> = row.try_get("picture_url")?;
+
+            serde_json::json!({
+                "question": question,
+                "possible_answers": possible_answers.split(';').collect::<Vec<&str>>(),
+                "is_multiple": is_multiple,
+                "picture_url": picture_url
+            })
+        }
+        TaskType::Lecture => {
+            let text: String = row.try_get("text")?;
+            let picture_url: Option<String> = row.try_get("picture_url")?;
+            let video_url: Option<String> = row.try_get("video_url")?;
+            serde_json::json!({
+                "text": text,
+                "picture_url": picture_url,
+                "video_url": video_url
+            })
+        }
+        TaskType::Prompt => unimplemented!(),
+    };
 
     Ok(Task::new(task_id, module_id, title, task_type, content))
 }

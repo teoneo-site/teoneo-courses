@@ -25,7 +25,7 @@ pub async fn get_all_courses(State(state): State<MySqlPool>) -> Result<Response,
             return Ok((StatusCode::OK, headers, body).into_response());
         }
         Err(why) => {
-            eprintln!("Why: {}", why);
+            eprintln!("Why co: {}", why);
 
             let mut headers = HeaderMap::new();
             headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
@@ -59,7 +59,7 @@ pub async fn get_course(
             return Ok((StatusCode::OK, headers, body).into_response());
         }
         Err(why) => {
-            eprintln!("Why: {}", why);
+            eprintln!("Why co: {}", why);
 
             let mut headers = HeaderMap::new();
             headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));

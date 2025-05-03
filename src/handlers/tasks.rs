@@ -6,10 +6,14 @@ use axum::{
 use serde_json::json;
 use sqlx::MySqlPool;
 
-use crate::{common, controllers::{self, task::{QuizTask, TaskType}}, handlers::{self, ErrorTypes}};
-
-
-
+use crate::{
+    common,
+    controllers::{
+        self,
+        task::{QuizTask, TaskType},
+    },
+    handlers::{self, ErrorTypes},
+};
 
 pub async fn get_tasks_for_module(
     State(state): State<MySqlPool>,
@@ -31,7 +35,8 @@ pub async fn get_tasks_for_module(
             // Check ownership TODO: API for verifying ownership of a course
             true
         }
-        Err(why) => { // Since it aint working rn we comment it
+        Err(why) => {
+            // Since it aint working rn we comment it
             false
             // eprintln!("Why: {}", why);
             // let mut headers = HeaderMap::new();
@@ -56,7 +61,7 @@ pub async fn get_tasks_for_module(
             return Ok((StatusCode::OK, headers, body).into_response());
         }
         Err(why) => {
-            eprintln!("Why: {}", why);
+            eprintln!("Why failed: {}", why);
 
             let mut headers = HeaderMap::new();
             headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
@@ -73,8 +78,6 @@ pub async fn get_tasks_for_module(
         }
     };
 }
-
-
 
 pub async fn get_task(
     State(state): State<MySqlPool>,
@@ -96,7 +99,8 @@ pub async fn get_task(
             // Check ownership TODO: API for verifying ownership of a course
             true
         }
-        Err(why) => { // Since it aint working rn we comment it
+        Err(why) => {
+            // Since it aint working rn we comment it
             false
             // eprintln!("Why: {}", why);
             // let mut headers = HeaderMap::new();
@@ -110,13 +114,7 @@ pub async fn get_task(
     };
 
     match controllers::task::get_task(&state, module_id, task_id).await {
-        Ok(mut task) => {
-            if task.task_type == TaskType::Quiz {
-                let mut quiz: QuizTask = serde_json::from_value(task.content).unwrap();
-                quiz.answers.clear();
-                task.content = serde_json::to_value(quiz).unwrap();
-            } 
-            
+        Ok(task) => {
             let body = json!({
                 "data": task,
             })
@@ -127,7 +125,7 @@ pub async fn get_task(
             return Ok((StatusCode::OK, headers, body).into_response());
         }
         Err(why) => {
-            eprintln!("Why: {}", why);
+            eprintln!("Why task: {}", why);
 
             let mut headers = HeaderMap::new();
             headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
@@ -144,4 +142,3 @@ pub async fn get_task(
         }
     };
 }
-
