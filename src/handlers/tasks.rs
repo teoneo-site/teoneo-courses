@@ -41,15 +41,15 @@ pub async fn get_tasks_for_module(
         }
         Err(why) => {
             // Since it aint working rn we comment it
-            false
+            // false
             // eprintln!("Why: {}", why);
-            // let mut headers = HeaderMap::new();
-            // headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
-            // return Err((StatusCode::UNAUTHORIZED, headers, serde_json::to_string_pretty(&handlers::ErrorResponse::new(
-            //     &ErrorTypes::JwtTokenExpired.to_string(),
-            //     "Token update requested",
-            // ))
-            // .unwrap()).into_response())
+            let mut headers = HeaderMap::new();
+            headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+            return Err((StatusCode::UNAUTHORIZED, headers, serde_json::to_string_pretty(&handlers::ErrorResponse::new(
+                &ErrorTypes::JwtTokenExpired.to_string(),
+                "Token update requested",
+            ))
+            .unwrap()).into_response())
         }
     };
 
@@ -105,15 +105,15 @@ pub async fn get_task(
         }
         Err(why) => {
             // Since it aint working rn we comment it
-            false
-            // eprintln!("Why: {}", why);
-            // let mut headers = HeaderMap::new();
-            // headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
-            // return Err((StatusCode::UNAUTHORIZED, headers, serde_json::to_string_pretty(&handlers::ErrorResponse::new(
-            //     &ErrorTypes::JwtTokenExpired.to_string(),
-            //     "Token update requested",
-            // ))
-            // .unwrap()).into_response())
+            // false
+            eprintln!("Why: {}", why);
+            let mut headers = HeaderMap::new();
+            headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+            return Err((StatusCode::UNAUTHORIZED, headers, serde_json::to_string_pretty(&handlers::ErrorResponse::new(
+                &ErrorTypes::JwtTokenExpired.to_string(),
+                "Token update requested",
+            ))
+            .unwrap()).into_response())
         }
     };
 
@@ -156,7 +156,7 @@ pub struct SubmitPayload {
 pub async fn submit_task(
     State(state): State<MySqlPool>,
     headers: HeaderMap,
-    Path((course_id, module_id, task_id)): Path<(i32, i32, i32)>, // We dont really need module_id tho, just course (not necessary and)
+    Path((_course_id, _module_id, task_id)): Path<(i32, i32, i32)>, // We dont really need module_id tho, just course (not necessary and)
     Json(user_answers): Json<serde_json::Value>,
 ) -> Result<Response, Response> {
     let empty = HeaderValue::from_static("");
@@ -173,19 +173,19 @@ pub async fn submit_task(
         // TODO: Move to utilities (it repeats a lot)
         Ok(user_id) => user_id,
         Err(why) => {
-            6 // test user id (exists in table)
+            // 6// test user id (exists in table)
             // Since it aint working rn we comment it
-            // egprintln!("Why: {}", why);
-            // let mut headers = HeaderMap::new();
-            // headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
-            // return Err((StatusCode::UNAUTHORIZED, headers, serde_json::to_string_pretty(&handlers::ErrorResponse::new(
-            //     &ErrorTypes::JwtTokenExpired.to_string(),
-            //     "Token update requested",
-            // ))
-            // .unwrap()).into_response())
+            println!("Why: {}", why);
+            let mut headers = HeaderMap::new();
+            headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+            return Err((StatusCode::UNAUTHORIZED, headers, serde_json::to_string_pretty(&handlers::ErrorResponse::new(
+                &ErrorTypes::JwtTokenExpired.to_string(),
+                "Token update requested",
+            ))
+            .unwrap()).into_response())
         }
     };
-    let is_subscribe_to_course = false; // TODO: Validation
+    let _is_subscribe_to_course = false; // TODO: Validation
 
     let task_type = match db::taskdb::fetch_task_type(&state, task_id).await {
         Ok(task_type) => task_type,
@@ -295,16 +295,16 @@ pub async fn task_progress(
         // TODO: Move to utilities (it repeats a lot)
         Ok(user_id) => user_id,
         Err(why) => {
-            6 // test user id (exists in table)
+            // 6 // test user id (exists in table)
             // Since it aint working rn we comment it
-            // egprintln!("Why: {}", why);
-            // let mut headers = HeaderMap::new();
-            // headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
-            // return Err((StatusCode::UNAUTHORIZED, headers, serde_json::to_string_pretty(&handlers::ErrorResponse::new(
-            //     &ErrorTypes::JwtTokenExpired.to_string(),
-            //     "Token update requested",
-            // ))
-            // .unwrap()).into_response())
+            println!("Why: {}", why);
+            let mut headers = HeaderMap::new();
+            headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+            return Err((StatusCode::UNAUTHORIZED, headers, serde_json::to_string_pretty(&handlers::ErrorResponse::new(
+                &ErrorTypes::JwtTokenExpired.to_string(),
+                "Token update requested",
+            ))
+            .unwrap()).into_response())
         }
     };
     let is_subscribe_to_course = false; // TODO: Validation (FORBIDDEN if doesnt own the course)
