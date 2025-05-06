@@ -55,7 +55,7 @@ pub async fn get_modules_for_course(
     };
 }
 
-// PUBLCI GET /course/{course_id} - Get info about a single course
+
 pub async fn get_module(
     State(state): State<MySqlPool>,
     headers: HeaderMap,
@@ -77,7 +77,7 @@ pub async fn get_module(
             true
         }
         Err(why) => {
-            eprintln!("Why mo: {}", why);
+            eprintln!("Why mo kilka: {}", why);
             false // If user isnt logged in its okay, he'll see public part of the module
         }
     };
@@ -108,7 +108,7 @@ pub async fn get_module(
             return Ok((StatusCode::OK, headers, body).into_response());
         }
         Err(why) => {
-            eprintln!("Why mo: {}", why);
+            eprintln!("Why mo cock: {}", why);
 
             let mut headers = HeaderMap::new();
             headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
