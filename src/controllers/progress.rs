@@ -1,0 +1,83 @@
+use std::fmt::Display;
+
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use sqlx::MySqlPool;
+
+use crate::db;
+
+#[derive(Serialize, Deserialize, PartialEq)]
+pub enum ProgressStatus {
+    #[serde(alias = "EVAL")]
+    Eval,
+    #[serde(alias = "FAILED")]
+    Failed,
+    #[serde(alias = "SUCCESS")]
+    Success,
+}
+
+impl Display for ProgressStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Eval => write!(f, "EVAL"),
+            Self::Failed => write!(f, "FAILED"),
+            Self::Success => write!(f, "SUCCESS"),
+        }
+    }
+}
+
+impl From<String> for ProgressStatus {
+    fn from(value: String) -> Self {
+        match value.to_lowercase().as_str() {
+            "eval" => Self::Eval,
+            "failed" => Self::Failed,
+            "success" => Self::Success,
+            _ => panic!("Unknown task type"),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct Progress {
+    id: u32,
+    user_id: u32,
+    task_id: i32,
+    status: ProgressStatus,
+    submission: serde_json::Value,
+    score: f32,
+    attempts: i32,
+    updated_at: DateTime<Utc>
+}
+
+impl Progress {
+    pub fn new(id: u32,
+        user_id: u32,
+        task_id: i32,
+        status: ProgressStatus,
+        submission: serde_json::Value,
+        score: f32,
+        attempts: i32,
+        updated_at: DateTime<Utc>) 
+    -> Self {
+        Self { id, user_id, task_id, status, submission, score, attempts, updated_at }
+    }
+}
+
+pub async fn update_or_insert_status(
+    pool: &MySqlPool,
+    user_id: u32,
+    task_id: i32,
+    status: ProgressStatus,
+    submission: String,
+    score: f32,
+    attempts: i32,
+) -> anyhow::Result<()> {
+    db::progressdb::update_or_insert(pool, user_id, task_id, status, submission, score, attempts)
+        .await?;
+    Ok(())
+}
+
+pub async fn get_task_progress(pool: &MySqlPool, user_id: u32, task_id: i32) -> anyhow::Result<Progress> {
+    let progress = db::progressdb::fetch_task_progress(pool, user_id, task_id).await?;
+    Ok(progress)
+}

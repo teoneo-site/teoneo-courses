@@ -27,7 +27,7 @@ impl Display for TaskType {
 
 impl From<String> for TaskType {
     fn from(value: String) -> Self {
-        match value.as_str() {
+        match value.to_lowercase().as_str() {
             "quiz" => Self::Quiz,
             "lecture" => Self::Lecture,
             "prompt" => Self::Prompt,
@@ -90,6 +90,11 @@ pub struct QuizTask {
     pub is_multiple: bool,
     pub answers: Vec<u8>, // string div by ';'
     pub picture_url: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct QuizUserAnswer {
+    pub answers: Vec<u8>,
 }
 
 #[derive(Serialize, Deserialize)]

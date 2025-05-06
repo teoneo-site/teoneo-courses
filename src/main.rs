@@ -30,6 +30,8 @@ async fn main() {
         .route("/courses/{course_id}/modules/{module_id}", axum::routing::get(handlers::modules::get_module))
         .route("/courses/{course_id}/modules/{module_id}/tasks", axum::routing::get(handlers::tasks::get_tasks_for_module))
         .route("/courses/{course_id}/modules/{module_id}/tasks/{task_id}", axum::routing::get(handlers::tasks::get_task))
+        .route("/courses/{course_id}/modules/{module_id}/tasks/{task_id}/submit", axum::routing::post(handlers::tasks::submit_task))
+        .route("/courses/{course_id}/modules/{module_id}/tasks/{task_id}/progress", axum::routing::get(handlers::tasks::task_progress))
         .layer(CorsLayer::permissive().allow_origin(tower_http::cors::Any))
         .with_state(mysql_pool);
 

@@ -27,6 +27,37 @@ pub async fn fetch_tasks_for_module(
     Ok(result)
 }
 
+pub async fn fetch_task_type(pool: &MySqlPool, task_id: i32) -> anyhow::Result<TaskType> {
+    let row = sqlx::query("SELECT type FROM tasks WHERE id = ?")
+        .bind(task_id)
+        .fetch_one(pool)
+        .await?;
+
+    let task_type: TaskType = row.try_get::<String, _>("type")?.into();
+    Ok(task_type)
+}
+
+pub async fn fetch_task_answers(
+    pool: &MySqlPool,
+    task_type: TaskType,
+    task_id: i32,
+) -> anyhow::Result<String> {
+    let row = match task_type {
+        TaskType::Quiz => {
+            sqlx::query("SELECT answers FROM quizzes WHERE task_id = ?")
+                .bind(task_id)
+                .fetch_one(pool)
+                .await
+        }
+        _ => {
+            panic!("Answers isn't supported for this TaskType")
+        }
+    }?;
+
+    let answers: String = row.try_get(0)?;
+    Ok(answers)
+}
+
 pub async fn fetch_task(pool: &MySqlPool, module_id: i32, task_id: i32) -> anyhow::Result<Task> {
     let row = sqlx::query("SELECT t.title, t.type,
                                              q.question, q.possible_answers, q.is_multiple,
