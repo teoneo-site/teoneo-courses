@@ -13,6 +13,8 @@ pub enum TaskType {
     Lecture,
     #[serde(alias = "prompt")]
     Prompt,
+    #[serde(alias = "match")]
+    Match,
 }
 
 impl Display for TaskType {
@@ -21,6 +23,7 @@ impl Display for TaskType {
             Self::Quiz => write!(f, "quiz"),
             Self::Lecture => write!(f, "lecture"),
             Self::Prompt => write!(f, "prompt"),
+            Self::Match => write!(f, "match"),
         }
     }
 }
@@ -31,6 +34,7 @@ impl From<String> for TaskType {
             "quiz" => Self::Quiz,
             "lecture" => Self::Lecture,
             "prompt" => Self::Prompt,
+            "match" => Self::Match,
             _ => panic!("Unknown task type"),
         }
     }

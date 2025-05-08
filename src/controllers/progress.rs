@@ -14,6 +14,8 @@ pub enum ProgressStatus {
     Failed,
     #[serde(alias = "SUCCESS")]
     Success,
+    #[serde(alias = "MAX_ATTEMPTS")]
+    MaxAttempts,
 }
 
 impl Display for ProgressStatus {
@@ -22,6 +24,7 @@ impl Display for ProgressStatus {
             Self::Eval => write!(f, "EVAL"),
             Self::Failed => write!(f, "FAILED"),
             Self::Success => write!(f, "SUCCESS"),
+            Self::MaxAttempts => write!(f, "MAX_ATTEMPTS")
         }
     }
 }
@@ -32,6 +35,7 @@ impl From<String> for ProgressStatus {
             "eval" => Self::Eval,
             "failed" => Self::Failed,
             "success" => Self::Success,
+            "max_attempts" => Self::MaxAttempts,
             _ => panic!("Unknown task type"),
         }
     }

@@ -48,6 +48,12 @@ pub async fn fetch_task_answers(
                 .bind(task_id)
                 .fetch_one(pool)
                 .await
+        },
+        TaskType::Match => {
+            sqlx::query("SELECT answers FROM matches WHERE task_id = ?")
+                .bind(task_id)
+                .fetch_one(pool)
+                .await
         }
         _ => {
             panic!("Answers isn't supported for this TaskType")
@@ -60,15 +66,18 @@ pub async fn fetch_task_answers(
 
 pub async fn fetch_task(pool: &MySqlPool, module_id: i32, task_id: i32) -> anyhow::Result<Task> {
     let row = sqlx::query("SELECT t.title, t.type,
-                                             q.question, q.possible_answers, q.is_multiple,
-                                             l.text, l.picture_url, l.video_url
+                                             q.question as qquestion, q.possible_answers, q.is_multiple,
+                                             l.text, l.picture_url, l.video_url,
+                                             m.question, m.left_items, m.right_items, m.picture_url
                                       FROM tasks t
                                       LEFT JOIN quizzes q ON t.id = q.task_id AND t.type = 'Quiz'
                                       LEFT JOIN lectures l ON t.id = l.task_id AND t.type = 'Lecture'
+                                      LEFT JOIN matches m ON t.id = m.task_id AND t.type = 'Match'
                                       WHERE t.id = ?")
         .bind(task_id)
         .fetch_one(pool)
         .await?;
+    // CHANGE HERE
 
     let title: String = row.try_get("title")?;
     let task_type_str: String = row.try_get("type")?;
@@ -76,7 +85,8 @@ pub async fn fetch_task(pool: &MySqlPool, module_id: i32, task_id: i32) -> anyho
 
     let content = match task_type {
         TaskType::Quiz => {
-            let question: String = row.try_get("question")?;
+            let question: String = row.try_get("qquestion")?;
+            println!("here");
             let possible_answers: String = row.try_get("possible_answers")?;
             let is_multiple: bool = row.try_get("is_multiple")?;
             let picture_url: Option<String> = row.try_get("picture_url")?;
@@ -96,6 +106,19 @@ pub async fn fetch_task(pool: &MySqlPool, module_id: i32, task_id: i32) -> anyho
                 "text": text,
                 "picture_url": picture_url,
                 "video_url": video_url
+            })
+        },
+        TaskType::Match => {
+            let question: String = row.try_get("question")?;
+            let left_items: String = row.try_get("left_items")?;
+            let right_items: String = row.try_get("right_items")?;
+            let picture_url: Option<String> = row.try_get("picture_url")?;
+
+            serde_json::json!({
+                "question": question,
+                "left_items": left_items.split(';').collect::<Vec<&str>>(),
+                "right_items": right_items.split(';').collect::<Vec<&str>>(),
+                "picture_url": picture_url,
             })
         }
         TaskType::Prompt => unimplemented!(),

@@ -129,7 +129,7 @@ pub async fn get_task(
             return Ok((StatusCode::OK, headers, body).into_response());
         }
         Err(why) => {
-            eprintln!("Why task: {}", why);
+            eprintln!("Why task fetch one: {}", why);
 
             let mut headers = HeaderMap::new();
             headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
@@ -222,6 +222,53 @@ pub async fn submit_task(
 
     match task_type {
         TaskType::Quiz => {
+            let answers_str = db::taskdb::fetch_task_answers(&state, task_type, task_id)
+                .await
+                .unwrap(); // TODO: Handle
+            let task_answers: Vec<u8> = answers_str
+                .split(";")
+                .map(|element| element.parse::<u8>().unwrap_or(0))
+                .collect();
+            let user_answers: QuizUserAnswer =
+                serde_json::from_value(user_answers["data"].clone()).unwrap(); // TODO: Handle
+
+            if task_answers.len() != user_answers.answers.len()
+                || task_answers
+                    .iter()
+                    .zip(&user_answers.answers)
+                    .filter(|&(a, b)| a == b)
+                    .count()
+                    != task_answers.len()
+            {
+                controllers::progress::update_or_insert_status(
+                    &state,
+                    user_id,
+                    task_id,
+                    ProgressStatus::Failed,
+                    serde_json::to_string(&user_answers).unwrap(),
+                    0.0,
+                    1,
+                )
+                .await
+                .unwrap(); // Careful
+            } else {
+                // Set status to SUCCESSS, submission to user_answers, score to 1.0, attempts to 1 if exists + 1
+                controllers::progress::update_or_insert_status(
+                    &state,
+                    user_id,
+                    task_id,
+                    ProgressStatus::Success,
+                    serde_json::to_string(&user_answers).unwrap(),
+                    1.0,
+                    1,
+                )
+                .await
+                .unwrap(); // Careful
+            }
+
+            return Ok((StatusCode::ACCEPTED).into_response());
+        },
+        TaskType::Match => {
             let answers_str = db::taskdb::fetch_task_answers(&state, task_type, task_id)
                 .await
                 .unwrap(); // TODO: Handle
