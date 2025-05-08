@@ -14,7 +14,7 @@ async fn main() {
     tracing_subscriber::fmt::init();
     dotenv::dotenv().ok();
 
-    let connect_str = "mysql://klewy:root@localhost:3306/teoneo";
+    let connect_str = "mysql://root:root@172.17.0.1:3306/teoneo";
     let mysql_pool = MySqlPoolOptions::new()
         .max_connections(5)
         .acquire_timeout(Duration::from_secs(10))
