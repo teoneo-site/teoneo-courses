@@ -17,10 +17,11 @@ use crate::{
     },
     db,
     handlers::{self, ErrorTypes},
+    AppState,
 };
 
 pub async fn get_tasks_for_module(
-    State(state): State<MySqlPool>,
+    State(state): State<AppState>,
     headers: HeaderMap,
     Path((course_id, module_id)): Path<(i32, i32)>,
 ) -> Result<Response, Response> {
@@ -45,15 +46,20 @@ pub async fn get_tasks_for_module(
             // eprintln!("Why: {}", why);
             let mut headers = HeaderMap::new();
             headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
-            return Err((StatusCode::UNAUTHORIZED, headers, serde_json::to_string_pretty(&handlers::ErrorResponse::new(
-                &ErrorTypes::JwtTokenExpired.to_string(),
-                "Token update requested",
-            ))
-            .unwrap()).into_response())
+            return Err((
+                StatusCode::UNAUTHORIZED,
+                headers,
+                serde_json::to_string_pretty(&handlers::ErrorResponse::new(
+                    &ErrorTypes::JwtTokenExpired.to_string(),
+                    "Token update requested",
+                ))
+                .unwrap(),
+            )
+                .into_response());
         }
     };
 
-    match controllers::task::get_tasks_for_module(&state, module_id).await {
+    match controllers::task::get_tasks_for_module(&state.pool, module_id).await {
         Ok(tasks) => {
             let body = json!({
                 "data": tasks,
@@ -84,7 +90,7 @@ pub async fn get_tasks_for_module(
 }
 
 pub async fn get_task(
-    State(state): State<MySqlPool>,
+    State(state): State<AppState>,
     headers: HeaderMap,
     Path((course_id, module_id, task_id)): Path<(i32, i32, i32)>,
 ) -> Result<Response, Response> {
@@ -109,15 +115,20 @@ pub async fn get_task(
             eprintln!("Why: {}", why);
             let mut headers = HeaderMap::new();
             headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
-            return Err((StatusCode::UNAUTHORIZED, headers, serde_json::to_string_pretty(&handlers::ErrorResponse::new(
-                &ErrorTypes::JwtTokenExpired.to_string(),
-                "Token update requested",
-            ))
-            .unwrap()).into_response())
+            return Err((
+                StatusCode::UNAUTHORIZED,
+                headers,
+                serde_json::to_string_pretty(&handlers::ErrorResponse::new(
+                    &ErrorTypes::JwtTokenExpired.to_string(),
+                    "Token update requested",
+                ))
+                .unwrap(),
+            )
+                .into_response());
         }
     };
 
-    match controllers::task::get_task(&state, module_id, task_id).await {
+    match controllers::task::get_task(&state.pool, module_id, task_id).await {
         Ok(task) => {
             let body = json!({
                 "data": task,
@@ -154,7 +165,7 @@ pub struct SubmitPayload {
 
 // POST /course/.../modules/.../tasks/.../submit
 pub async fn submit_task(
-    State(state): State<MySqlPool>,
+    State(state): State<AppState>,
     headers: HeaderMap,
     Path((_course_id, _module_id, task_id)): Path<(i32, i32, i32)>, // We dont really need module_id tho, just course (not necessary and)
     Json(user_answers): Json<serde_json::Value>,
@@ -173,21 +184,26 @@ pub async fn submit_task(
         // TODO: Move to utilities (it repeats a lot)
         Ok(user_id) => user_id,
         Err(why) => {
-            // 6// test user id (exists in table)
-            // Since it aint working rn we comment it
-            println!("Why: {}", why);
-            let mut headers = HeaderMap::new();
-            headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
-            return Err((StatusCode::UNAUTHORIZED, headers, serde_json::to_string_pretty(&handlers::ErrorResponse::new(
-                &ErrorTypes::JwtTokenExpired.to_string(),
-                "Token update requested",
-            ))
-            .unwrap()).into_response())
+            12 // test user id (exists in table)
+               // Since it aint working rn we comment it
+               // println!("Why: {}", why);
+               // let mut headers = HeaderMap::new();
+               // headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+               // return Err((
+               //     StatusCode::UNAUTHORIZED,
+               //     headers,
+               //     serde_json::to_string_pretty(&handlers::ErrorResponse::new(
+               //         &ErrorTypes::JwtTokenExpired.to_string(),
+               //         "Token update requested",
+               //     ))
+               //     .unwrap(),
+               // )
+               //     .into_response());
         }
     };
     let _is_subscribe_to_course = false; // TODO: Validation
 
-    let task_type = match db::taskdb::fetch_task_type(&state, task_id).await {
+    let task_type = match db::taskdb::fetch_task_type(&state.pool, task_id).await {
         Ok(task_type) => task_type,
         Err(why) => {
             eprintln!("Why: {}", why);
@@ -209,7 +225,7 @@ pub async fn submit_task(
     // Insert EVAL progress status
     // Frontend can query status at this point
     controllers::progress::update_or_insert_status(
-        &state,
+        &state.pool,
         user_id,
         task_id,
         ProgressStatus::Eval,
@@ -221,8 +237,8 @@ pub async fn submit_task(
     .unwrap(); // Careful
 
     match task_type {
-        TaskType::Quiz => {
-            let answers_str = db::taskdb::fetch_task_answers(&state, task_type, task_id)
+        TaskType::Quiz | TaskType::Match => {
+            let answers_str = db::taskdb::fetch_task_answers(&state.pool, task_type, task_id)
                 .await
                 .unwrap(); // TODO: Handle
             let task_answers: Vec<u8> = answers_str
@@ -241,7 +257,7 @@ pub async fn submit_task(
                     != task_answers.len()
             {
                 controllers::progress::update_or_insert_status(
-                    &state,
+                    &state.pool,
                     user_id,
                     task_id,
                     ProgressStatus::Failed,
@@ -254,54 +270,7 @@ pub async fn submit_task(
             } else {
                 // Set status to SUCCESSS, submission to user_answers, score to 1.0, attempts to 1 if exists + 1
                 controllers::progress::update_or_insert_status(
-                    &state,
-                    user_id,
-                    task_id,
-                    ProgressStatus::Success,
-                    serde_json::to_string(&user_answers).unwrap(),
-                    1.0,
-                    1,
-                )
-                .await
-                .unwrap(); // Careful
-            }
-
-            return Ok((StatusCode::ACCEPTED).into_response());
-        },
-        TaskType::Match => {
-            let answers_str = db::taskdb::fetch_task_answers(&state, task_type, task_id)
-                .await
-                .unwrap(); // TODO: Handle
-            let task_answers: Vec<u8> = answers_str
-                .split(";")
-                .map(|element| element.parse::<u8>().unwrap_or(0))
-                .collect();
-            let user_answers: QuizUserAnswer =
-                serde_json::from_value(user_answers["data"].clone()).unwrap(); // TODO: Handle
-
-            if task_answers.len() != user_answers.answers.len()
-                || task_answers
-                    .iter()
-                    .zip(&user_answers.answers)
-                    .filter(|&(a, b)| a == b)
-                    .count()
-                    != task_answers.len()
-            {
-                controllers::progress::update_or_insert_status(
-                    &state,
-                    user_id,
-                    task_id,
-                    ProgressStatus::Failed,
-                    serde_json::to_string(&user_answers).unwrap(),
-                    0.0,
-                    1,
-                )
-                .await
-                .unwrap(); // Careful
-            } else {
-                // Set status to SUCCESSS, submission to user_answers, score to 1.0, attempts to 1 if exists + 1
-                controllers::progress::update_or_insert_status(
-                    &state,
+                    &state.pool,
                     user_id,
                     task_id,
                     ProgressStatus::Success,
@@ -315,18 +284,91 @@ pub async fn submit_task(
 
             return Ok((StatusCode::ACCEPTED).into_response());
         }
+        TaskType::Prompt => {
+            tokio::spawn(async move {
+                // Get attemps, max attemps and additional_field
+                let mut pool = state.pool;
+                let mut client = state.ai;
+                let (attempts, max_attemps) =
+                    db::progressdb::get_prompt_task_attemps(&pool, user_id, task_id)
+                        .await
+                        .unwrap();
+                if attempts >= max_attemps {
+                    controllers::progress::update_or_insert_status(
+                        &pool,
+                        user_id,
+                        task_id,
+                        ProgressStatus::MaxAttempts,
+                        "".to_string(),
+                        0.0,
+                        0,
+                    )
+                    .await
+                    .unwrap();
+                }
+
+                let (question, add_prompt) = db::taskdb::fetch_prompt_details(&pool, task_id)
+                    .await
+                    .unwrap();
+                let user_prompt = user_answers["data"]["user_prompt"]
+                    .as_str()
+                    .unwrap_or_default();
+
+                let message = controllers::task::PROMPT_TEMPLATE
+                    .to_owned()
+                    .replace("{question}", &question)
+                    .replace("{user_prompt}", &user_prompt)
+                    .replace("{additional_prompt}", &add_prompt.unwrap_or_default());
+
+                let reply = client.send_message(message.into()).await.unwrap();
+
+                let reply_struct: controllers::task::PromptReply =
+                    serde_json::from_str(&reply.content).unwrap();
+
+                let mut json_submission: serde_json::Value =
+                    serde_json::Value::Object(serde_json::Map::new());
+                json_submission["reply"] = reply_struct.reply.into();
+                json_submission["feedback"] = reply_struct.feedback.into();
+                let score: f32 = reply_struct.score;
+
+                if score < 0.3 {
+                    controllers::progress::update_or_insert_status(
+                        &pool,
+                        user_id,
+                        task_id,
+                        ProgressStatus::Failed,
+                        json_submission.to_string(),
+                        score,
+                        0,
+                    )
+                    .await
+                    .unwrap();
+                } else {
+                    controllers::progress::update_or_insert_status(
+                        &pool,
+                        user_id,
+                        task_id,
+                        ProgressStatus::Success,
+                        json_submission.to_string(),
+                        score,
+                        0,
+                    )
+                    .await
+                    .unwrap();
+                }
+            });
+        }
         TaskType::Lecture => {}
-        TaskType::Prompt => {}
     };
 
     return Ok((StatusCode::ACCEPTED).into_response());
 }
 
 // GET /course/.../modules/.../tasks/.../progress
-pub async fn task_progress( 
-    State(state): State<MySqlPool>,
+pub async fn task_progress(
+    State(state): State<AppState>,
     headers: HeaderMap,
-    Path((course_id, module_id, task_id)): Path<(i32, i32, i32)>
+    Path((course_id, module_id, task_id)): Path<(i32, i32, i32)>,
 ) -> Result<Response, Response> {
     let empty = HeaderValue::from_static("");
     let token = headers
@@ -347,25 +389,31 @@ pub async fn task_progress(
             println!("Why: {}", why);
             let mut headers = HeaderMap::new();
             headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
-            return Err((StatusCode::UNAUTHORIZED, headers, serde_json::to_string_pretty(&handlers::ErrorResponse::new(
-                &ErrorTypes::JwtTokenExpired.to_string(),
-                "Token update requested",
-            ))
-            .unwrap()).into_response())
+            return Err((
+                StatusCode::UNAUTHORIZED,
+                headers,
+                serde_json::to_string_pretty(&handlers::ErrorResponse::new(
+                    &ErrorTypes::JwtTokenExpired.to_string(),
+                    "Token update requested",
+                ))
+                .unwrap(),
+            )
+                .into_response());
         }
     };
     let is_subscribe_to_course = false; // TODO: Validation (FORBIDDEN if doesnt own the course)
 
-    match controllers::progress::get_task_progress(&state, user_id, task_id).await {
+    match controllers::progress::get_task_progress(&state.pool, user_id, task_id).await {
         Ok(progress) => {
             let body = json!({
                 "data": progress
-            }).to_string();
+            })
+            .to_string();
 
             let mut headers = HeaderMap::new();
             headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
             return Ok((StatusCode::OK, headers, body).into_response());
-        },
+        }
         Err(why) => {
             eprintln!("Could not get progress (handler): {}", why);
             let mut headers = HeaderMap::new();

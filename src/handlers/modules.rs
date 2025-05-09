@@ -9,14 +9,15 @@ use sqlx::MySqlPool;
 use crate::{
     common, controllers,
     handlers::{self, ErrorTypes},
+    AppState,
 };
 
 // PUBLCI GET /course/{course_id}/modules - Get info course's modules (id, course_id, title)
 pub async fn get_modules_for_course(
-    State(state): State<MySqlPool>,
+    State(state): State<AppState>,
     Path(course_id): Path<i32>,
 ) -> Result<Response, Response> {
-    match controllers::module::get_modules_for_course(&state, course_id).await {
+    match controllers::module::get_modules_for_course(&state.pool, course_id).await {
         Ok(modules) => {
             let mut json: serde_json::value::Value = serde_json::Value::Null;
             json["data"] = serde_json::Value::Array([].to_vec());
@@ -55,9 +56,8 @@ pub async fn get_modules_for_course(
     };
 }
 
-
 pub async fn get_module(
-    State(state): State<MySqlPool>,
+    State(state): State<AppState>,
     headers: HeaderMap,
     Path((course_id, module_id)): Path<(i32, i32)>,
 ) -> Result<Response, Response> {
@@ -82,7 +82,7 @@ pub async fn get_module(
         }
     };
 
-    match controllers::module::get_module(&state, course_id, module_id).await {
+    match controllers::module::get_module(&state.pool, course_id, module_id).await {
         Ok(module) => {
             let body = if is_subscribed_to_course {
                 json!({

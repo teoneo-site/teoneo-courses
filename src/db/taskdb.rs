@@ -48,7 +48,7 @@ pub async fn fetch_task_answers(
                 .bind(task_id)
                 .fetch_one(pool)
                 .await
-        },
+        }
         TaskType::Match => {
             sqlx::query("SELECT answers FROM matches WHERE task_id = ?")
                 .bind(task_id)
@@ -68,16 +68,17 @@ pub async fn fetch_task(pool: &MySqlPool, module_id: i32, task_id: i32) -> anyho
     let row = sqlx::query("SELECT t.title, t.type,
                                              q.question as qquestion, q.possible_answers, q.is_multiple,
                                              l.text, l.picture_url, l.video_url,
-                                             m.question, m.left_items, m.right_items, m.picture_url
+                                             m.question, m.left_items, m.right_items, m.picture_url,
+                                             p.question as pquestion, p.picture_url
                                       FROM tasks t
                                       LEFT JOIN quizzes q ON t.id = q.task_id AND t.type = 'Quiz'
                                       LEFT JOIN lectures l ON t.id = l.task_id AND t.type = 'Lecture'
                                       LEFT JOIN matches m ON t.id = m.task_id AND t.type = 'Match'
+                                      LEFT JOIN prompts p on t.id = p.task_id AND t.type = 'prompt'
                                       WHERE t.id = ?")
         .bind(task_id)
         .fetch_one(pool)
         .await?;
-    // CHANGE HERE
 
     let title: String = row.try_get("title")?;
     let task_type_str: String = row.try_get("type")?;
@@ -107,7 +108,7 @@ pub async fn fetch_task(pool: &MySqlPool, module_id: i32, task_id: i32) -> anyho
                 "picture_url": picture_url,
                 "video_url": video_url
             })
-        },
+        }
         TaskType::Match => {
             let question: String = row.try_get("question")?;
             let left_items: String = row.try_get("left_items")?;
@@ -121,8 +122,30 @@ pub async fn fetch_task(pool: &MySqlPool, module_id: i32, task_id: i32) -> anyho
                 "picture_url": picture_url,
             })
         }
-        TaskType::Prompt => unimplemented!(),
+        TaskType::Prompt => {
+            let question: String = row.try_get("pquestion")?;
+            let picture_url: Option<String> = row.try_get("picture_url")?;
+
+            serde_json::json!({
+                "question": question,
+                "picture_url": picture_url
+            })
+        }
     };
 
     Ok(Task::new(task_id, module_id, title, task_type, content))
+}
+
+pub async fn fetch_prompt_details(
+    pool: &MySqlPool,
+    task_id: i32,
+) -> anyhow::Result<(String, Option<String>)> {
+    let row = sqlx::query("SELECT question, additional_prompt FROM prompts WHERE task_id = ?")
+        .bind(task_id)
+        .fetch_one(pool)
+        .await?;
+
+    let question: String = row.try_get(0)?;
+    let additional_prompt: Option<String> = row.try_get(1)?;
+    Ok((question, additional_prompt))
 }

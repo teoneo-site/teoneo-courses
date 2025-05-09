@@ -15,7 +15,7 @@ pub async fn update_or_insert(
     score: f32,
     attempts: i32,
 ) -> anyhow::Result<()> {
-    sqlx::query("INSERT INTO task_progress (user_id, task_id, status, submission, score, attempts) VALUES (?, ?, ?, ?, ?, ?) 
+    sqlx::query("INSERT INTO task_progress (user_id, task_id, status, submission, score, attempts) VALUES (?, ?, ?, ?, ?, ?)
     ON DUPLICATE KEY UPDATE status = VALUES(status), submission = VALUES(submission), score = VALUES(score), attempts = IF(VALUES(status) = 'EVAL', attempts, attempts + 1), updated_at = CURRENT_TIMESTAMP
     ")
         .bind(user_id)
@@ -28,7 +28,11 @@ pub async fn update_or_insert(
     Ok(())
 }
 
-pub async fn fetch_task_progress(pool: &MySqlPool, user_id: u32, task_id: i32) -> anyhow::Result<Progress> {
+pub async fn fetch_task_progress(
+    pool: &MySqlPool,
+    user_id: u32,
+    task_id: i32,
+) -> anyhow::Result<Progress> {
     let row = sqlx::query("SELECT id, status, submission, score, attempts, updated_at FROM task_progress WHERE user_id = ? AND task_id = ?")
         .bind(user_id)
         .bind(task_id)
@@ -41,7 +45,24 @@ pub async fn fetch_task_progress(pool: &MySqlPool, user_id: u32, task_id: i32) -
     let attempts: i32 = row.try_get("attempts")?;
     let updated_at: DateTime<Utc> = row.try_get("updated_at")?;
 
-    let progress = Progress::new(id, user_id, task_id, status, submission, score, attempts, updated_at);
+    let progress = Progress::new(
+        id, user_id, task_id, status, submission, score, attempts, updated_at,
+    );
 
     Ok(progress)
+}
+
+pub async fn get_prompt_task_attemps(
+    pool: &MySqlPool,
+    user_id: u32,
+    task_id: i32,
+) -> anyhow::Result<(i32, i32)> {
+    let row = sqlx::query("SELECT t.attempts, p.max_attempts FROM task_progress t LEFT JOIN prompts p ON t.task_id = p.task_id WHERE t.user_id = ? AND t.task_id = ?")
+        .bind(user_id)
+        .bind(task_id)
+        .fetch_one(pool).await?;
+
+    let attempts: i32 = row.try_get(0)?;
+    let max_attempts: i32 = row.try_get(1)?;
+    Ok((attempts, max_attempts))
 }
