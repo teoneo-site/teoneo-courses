@@ -56,13 +56,13 @@ pub async fn get_prompt_task_attemps(
     pool: &MySqlPool,
     user_id: u32,
     task_id: i32,
-) -> anyhow::Result<(i32, Option<i32>)> {
+) -> anyhow::Result<(i32, i32)> {
     let row = sqlx::query("SELECT t.attempts, p.max_attempts FROM task_progress t LEFT JOIN prompts p ON t.task_id = p.task_id WHERE t.user_id = ? AND t.task_id = ?")
         .bind(user_id)
         .bind(task_id)
         .fetch_one(pool).await?;
 
     let attempts: i32 = row.try_get(0)?;
-    let max_attempts: Option<i32> = row.try_get(1)?;
+    let max_attempts: i32 = row.try_get(1)?;
     Ok((attempts, max_attempts))
 }

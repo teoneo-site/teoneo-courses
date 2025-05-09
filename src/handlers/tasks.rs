@@ -291,7 +291,7 @@ pub async fn submit_task(
                     .await
                     .unwrap(); // So unwrap() should not panic
 
-            if attempts >= max_attemps.unwrap_or(i32::MAX) {
+            if attempts >= max_attemps {
                 // Signal using 400 that max attempts is hit
                 return Err((
                     StatusCode::BAD_REQUEST,
@@ -320,7 +320,7 @@ pub async fn submit_task(
                 let message = controllers::task::PROMPT_TEMPLATE
                     .replace("{question}", &question)
                     .replace("{user_prompt}", &user_prompt)
-                    .replace("{additional_prompt}", &add_prompt.unwrap_or_default());
+                    .replace("{additional_prompt}", &add_prompt.unwrap_or("Нет доп. промпта".to_owned()));
 
                 let reply = client.send_message(message.into()).await.unwrap(); // Should not panic under normal circumstances, only if gigachat is down, then it returns 500 Server internal error
                 let reply_struct: controllers::task::PromptReply =
@@ -336,7 +336,7 @@ pub async fn submit_task(
                     &pool,
                     user_id,
                     task_id,
-                    if score < 0.3 {
+                    if score < 0.4 {
                         ProgressStatus::Failed
                     } else {
                         ProgressStatus::Success

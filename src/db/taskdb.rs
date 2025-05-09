@@ -125,7 +125,7 @@ pub async fn fetch_task(pool: &MySqlPool, module_id: i32, task_id: i32) -> anyho
         TaskType::Prompt => {
             let question: String = row.try_get("pquestion")?;
             let picture_url: Option<String> = row.try_get("picture_url")?;
-            let max_attempts: Option<i32> = row.try_get("max_attempts")?;
+            let max_attempts: i32 = row.try_get("max_attempts")?;
             serde_json::json!({
                 "question": question,
                 "picture_url": picture_url,
