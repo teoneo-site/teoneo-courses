@@ -8,14 +8,13 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use sqlx::MySqlPool;
 
 use crate::{
     common,
     controllers::{
         self,
         progress::ProgressStatus,
-        task::{QuizTask, QuizUserAnswer, TaskType},
+        task::{QuizUserAnswer, TaskType},
     },
     db,
     handlers::{self, ErrorTypes},
@@ -25,7 +24,7 @@ use crate::{
 pub async fn get_tasks_for_module(
     State(state): State<AppState>,
     headers: HeaderMap,
-    Path((course_id, module_id)): Path<(i32, i32)>,
+    Path((_course_id, module_id)): Path<(i32, i32)>,
 ) -> Result<Response, Response> {
     let empty = HeaderValue::from_static("");
     let token = headers
@@ -324,13 +323,11 @@ pub async fn submit_task(
                     .replace("{additional_prompt}", &add_prompt.unwrap_or_default());
 
                 let reply = client.send_message(message.into()).await.unwrap(); // Should not panic under normal circumstances, only if gigachat is down, then it returns 500 Server internal error
-
                 let reply_struct: controllers::task::PromptReply =
                     serde_json::from_str(&reply.content).unwrap(); // Panics on rate limit by gigachat, but 500 for this kind of situation is ok I guess?
 
                 let mut json_submission: serde_json::Value =
                     serde_json::Value::Object(serde_json::Map::new());
-
                 json_submission["reply"] = reply_struct.reply.into();
                 json_submission["feedback"] = reply_struct.feedback.into();
                 let score: f32 = reply_struct.score;
