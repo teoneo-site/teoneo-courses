@@ -1,12 +1,20 @@
-use std::time::Duration;
+use std::{any::Any, time::Duration};
 
-use axum::Router;
+use axum::{
+    http::{header::CONTENT_TYPE, HeaderMap, HeaderValue, StatusCode},
+    response::{IntoResponse, Response},
+    Router,
+};
 use gigalib::{
     controllers::client::{ClientBuilder, GigaClient},
     http::message::{MessageConfig, MessageConfigBuilder},
 };
+use handlers::ErrorTypes;
 use sqlx::{mysql::MySqlPoolOptions, MySql, Pool};
-use tower_http::cors::CorsLayer;
+use tower_http::{
+    catch_panic::{CatchPanic, CatchPanicLayer},
+    cors::CorsLayer,
+};
 
 mod common;
 mod controllers;
@@ -17,6 +25,31 @@ mod handlers;
 struct AppState {
     pool: Pool<MySql>,
     ai: GigaClient,
+}
+
+fn internal_server_error_handler(err: Box<dyn Any + Send + 'static>) -> Response {
+    let details = if let Some(s) = err.downcast_ref::<String>() {
+        s.clone()
+    } else if let Some(s) = err.downcast_ref::<&str>() {
+        s.to_string()
+    } else {
+        "Unknown panic message".to_string()
+    };
+    println!("Internal server error catched: {}", details);
+
+    let mut headers = HeaderMap::new();
+    headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+
+    (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        headers,
+        serde_json::to_string_pretty(&handlers::ErrorResponse::new(
+            &ErrorTypes::InternalError.to_string(),
+            &details,
+        ))
+        .unwrap(), // Should not panic, because struct is always valid for converting into JSON
+    )
+        .into_response()
 }
 
 #[tokio::main]
@@ -54,6 +87,7 @@ async fn main() {
         .route("/courses/{course_id}/modules/{module_id}/tasks/{task_id}/submit", axum::routing::post(handlers::tasks::submit_task))
         .route("/courses/{course_id}/modules/{module_id}/tasks/{task_id}/progress", axum::routing::get(handlers::tasks::task_progress))
         .layer(CorsLayer::permissive().allow_origin(tower_http::cors::Any))
+        .layer(CatchPanicLayer::custom(internal_server_error_handler))
         .with_state(app_state);
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await.unwrap();

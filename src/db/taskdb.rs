@@ -69,7 +69,7 @@ pub async fn fetch_task(pool: &MySqlPool, module_id: i32, task_id: i32) -> anyho
                                              q.question as qquestion, q.possible_answers, q.is_multiple,
                                              l.text, l.picture_url, l.video_url,
                                              m.question, m.left_items, m.right_items, m.picture_url,
-                                             p.question as pquestion, p.picture_url
+                                             p.question as pquestion, p.picture_url, p.max_attempts
                                       FROM tasks t
                                       LEFT JOIN quizzes q ON t.id = q.task_id AND t.type = 'Quiz'
                                       LEFT JOIN lectures l ON t.id = l.task_id AND t.type = 'Lecture'
@@ -125,10 +125,11 @@ pub async fn fetch_task(pool: &MySqlPool, module_id: i32, task_id: i32) -> anyho
         TaskType::Prompt => {
             let question: String = row.try_get("pquestion")?;
             let picture_url: Option<String> = row.try_get("picture_url")?;
-
+            let max_attempts: Option<i32> = row.try_get("max_attempts")?;
             serde_json::json!({
                 "question": question,
-                "picture_url": picture_url
+                "picture_url": picture_url,
+                "max_attempts": max_attempts
             })
         }
     };

@@ -184,21 +184,21 @@ pub async fn submit_task(
         // TODO: Move to utilities (it repeats a lot)
         Ok(user_id) => user_id,
         Err(why) => {
-            12 // test user id (exists in table)
-               // Since it aint working rn we comment it
-               // println!("Why: {}", why);
-               // let mut headers = HeaderMap::new();
-               // headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
-               // return Err((
-               //     StatusCode::UNAUTHORIZED,
-               //     headers,
-               //     serde_json::to_string_pretty(&handlers::ErrorResponse::new(
-               //         &ErrorTypes::JwtTokenExpired.to_string(),
-               //         "Token update requested",
-               //     ))
-               //     .unwrap(),
-               // )
-               //     .into_response());
+            // 12 // test user id (exists in table)
+            // Since it aint working rn we comment it
+            println!("Why: {}", why);
+            let mut headers = HeaderMap::new();
+            headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+            return Err((
+                StatusCode::UNAUTHORIZED,
+                headers,
+                serde_json::to_string_pretty(&handlers::ErrorResponse::new(
+                    &ErrorTypes::JwtTokenExpired.to_string(),
+                    "Token update requested",
+                ))
+                .unwrap(),
+            )
+                .into_response());
         }
     };
     let _is_subscribe_to_course = false; // TODO: Validation
@@ -285,31 +285,35 @@ pub async fn submit_task(
             return Ok((StatusCode::ACCEPTED).into_response());
         }
         TaskType::Prompt => {
+            let (attempts, max_attemps) =
+                db::progressdb::get_prompt_task_attemps(&state.pool, user_id, task_id) // Task is supposed to be prompt 100% at this point
+                    .await
+                    .unwrap(); // So unwrap() should not panic
+
+            if attempts >= max_attemps {
+                // Signal using 400 that max attempts is hit
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    headers,
+                    serde_json::to_string_pretty(&handlers::ErrorResponse::new(
+                        &ErrorTypes::MaxAttemptsSubmit.to_string(),
+                        "Try again later",
+                    ))
+                    .unwrap(), // Should not panic, because struct is always valid for converting into JSON
+                )
+                    .into_response());
+            }
+
             tokio::spawn(async move {
                 // Get attemps, max attemps and additional_field
-                let mut pool = state.pool;
+                let pool = state.pool;
                 let mut client = state.ai;
-                let (attempts, max_attemps) =
-                    db::progressdb::get_prompt_task_attemps(&pool, user_id, task_id)
-                        .await
-                        .unwrap();
-                if attempts >= max_attemps {
-                    controllers::progress::update_or_insert_status(
-                        &pool,
-                        user_id,
-                        task_id,
-                        ProgressStatus::MaxAttempts,
-                        "".to_string(),
-                        0.0,
-                        0,
-                    )
-                    .await
-                    .unwrap();
-                }
 
-                let (question, add_prompt) = db::taskdb::fetch_prompt_details(&pool, task_id)
+                println!("{} {}", attempts, max_attemps);
+
+                let (question, add_prompt) = db::taskdb::fetch_prompt_details(&pool, task_id) // Again, task_id is 100% Prompt type
                     .await
-                    .unwrap();
+                    .unwrap(); // This should not panic,only if Databse is broken, but then it will return 500 Server Internal Error on Panic
                 let user_prompt = user_answers["data"]["user_prompt"]
                     .as_str()
                     .unwrap_or_default();
@@ -320,10 +324,10 @@ pub async fn submit_task(
                     .replace("{user_prompt}", &user_prompt)
                     .replace("{additional_prompt}", &add_prompt.unwrap_or_default());
 
-                let reply = client.send_message(message.into()).await.unwrap();
+                let reply = client.send_message(message.into()).await.unwrap(); // Should not panic under normal circumstances, only if gigachat is down, then it returns 500 Server internal error
 
                 let reply_struct: controllers::task::PromptReply =
-                    serde_json::from_str(&reply.content).unwrap();
+                    serde_json::from_str(&reply.content).unwrap(); // Panics on rate limit by gigachat, but 500 for this kind of situation is ok I guess?
 
                 let mut json_submission: serde_json::Value =
                     serde_json::Value::Object(serde_json::Map::new());
@@ -331,31 +335,21 @@ pub async fn submit_task(
                 json_submission["feedback"] = reply_struct.feedback.into();
                 let score: f32 = reply_struct.score;
 
-                if score < 0.3 {
-                    controllers::progress::update_or_insert_status(
-                        &pool,
-                        user_id,
-                        task_id,
-                        ProgressStatus::Failed,
-                        json_submission.to_string(),
-                        score,
-                        0,
-                    )
-                    .await
-                    .unwrap();
-                } else {
-                    controllers::progress::update_or_insert_status(
-                        &pool,
-                        user_id,
-                        task_id,
-                        ProgressStatus::Success,
-                        json_submission.to_string(),
-                        score,
-                        0,
-                    )
-                    .await
-                    .unwrap();
-                }
+                controllers::progress::update_or_insert_status(
+                    &pool,
+                    user_id,
+                    task_id,
+                    if score < 0.3 {
+                        ProgressStatus::Failed
+                    } else {
+                        ProgressStatus::Success
+                    },
+                    json_submission.to_string(),
+                    score,
+                    0,
+                )
+                .await
+                .unwrap(); // Should not panic, since at this point there is "eval" row that will get updated
             });
         }
         TaskType::Lecture => {}

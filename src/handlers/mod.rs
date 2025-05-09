@@ -30,6 +30,7 @@ impl ErrorResponse {
 pub enum ErrorTypes {
     InternalError,
     JwtTokenExpired,
+    MaxAttemptsSubmit,
 }
 
 impl Display for ErrorTypes {
@@ -37,6 +38,7 @@ impl Display for ErrorTypes {
         match self {
             Self::InternalError => write!(f, "server_internal_error"),
             Self::JwtTokenExpired => write!(f, "jwt_token_expired"),
+            Self::MaxAttemptsSubmit => write!(f, "max_attempts_submit"),
         }
     }
 }
