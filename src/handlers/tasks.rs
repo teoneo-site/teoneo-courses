@@ -1,3 +1,5 @@
+use std::i32;
+
 use axum::{
     extract::{Path, State},
     http::{header::CONTENT_TYPE, HeaderMap, HeaderValue, StatusCode},
@@ -290,7 +292,7 @@ pub async fn submit_task(
                     .await
                     .unwrap(); // So unwrap() should not panic
 
-            if attempts >= max_attemps {
+            if attempts >= max_attemps.unwrap_or(i32::MAX) {
                 // Signal using 400 that max attempts is hit
                 return Err((
                     StatusCode::BAD_REQUEST,
@@ -308,8 +310,6 @@ pub async fn submit_task(
                 // Get attemps, max attemps and additional_field
                 let pool = state.pool;
                 let mut client = state.ai;
-
-                println!("{} {}", attempts, max_attemps);
 
                 let (question, add_prompt) = db::taskdb::fetch_prompt_details(&pool, task_id) // Again, task_id is 100% Prompt type
                     .await
