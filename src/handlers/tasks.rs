@@ -319,7 +319,6 @@ pub async fn submit_task(
                     .unwrap_or_default();
 
                 let message = controllers::task::PROMPT_TEMPLATE
-                    .to_owned()
                     .replace("{question}", &question)
                     .replace("{user_prompt}", &user_prompt)
                     .replace("{additional_prompt}", &add_prompt.unwrap_or_default());
@@ -331,6 +330,7 @@ pub async fn submit_task(
 
                 let mut json_submission: serde_json::Value =
                     serde_json::Value::Object(serde_json::Map::new());
+
                 json_submission["reply"] = reply_struct.reply.into();
                 json_submission["feedback"] = reply_struct.feedback.into();
                 let score: f32 = reply_struct.score;
