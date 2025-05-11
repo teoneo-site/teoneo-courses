@@ -31,7 +31,7 @@ pub async fn get_tasks_for_module(
         .and_then(|value| value.to_str().ok())
         .and_then(|s| s.split_whitespace().last())
         .unwrap_or("");
-
+    
     let _is_subscribed_to_course = match common::token::verify_jwt_token(token) {
         Ok(_user_id) => {
             // Check ownership TODO: API for verifying ownership of a course
