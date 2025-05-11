@@ -2,7 +2,7 @@ use std::i32;
 
 use axum::{
     extract::{Path, State},
-    http::{header::CONTENT_TYPE, HeaderMap, HeaderValue, StatusCode},
+    http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     Json,
 };
@@ -32,8 +32,8 @@ pub async fn get_tasks_for_module(
         .and_then(|s| s.split_whitespace().last())
         .unwrap_or("");
 
-    let is_subscribed_to_course = match common::token::verify_jwt_token(token) {
-        Ok(user_id) => {
+    let _is_subscribed_to_course = match common::token::verify_jwt_token(token) {
+        Ok(_user_id) => {
             // Check ownership TODO: API for verifying ownership of a course
             true
         }
@@ -41,16 +41,13 @@ pub async fn get_tasks_for_module(
             // Since it aint working rn we comment it
             // false
             // eprintln!("Why: {}", why);
-            let mut headers = HeaderMap::new();
-            headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
-            return Err((
+            return Err(ResponseBody::new(
                 StatusCode::UNAUTHORIZED,
-                headers,
-                serde_json::to_string_pretty(&handlers::ErrorResponse::new(
+                None,
+                handlers::ErrorResponse::new(
                     ErrorTypes::JwtTokenExpired,
                     "Token update requested",
-                ))
-                .unwrap(),
+                )
             )
                 .into_response());
         }
@@ -63,23 +60,17 @@ pub async fn get_tasks_for_module(
             })
             .to_string();
 
-            let mut headers = HeaderMap::new();
-            headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
-            return Ok((StatusCode::OK, headers, body).into_response());
+            return Ok(ResponseBody::new(StatusCode::OK, None, body).into_response());
         }
         Err(why) => {
             eprintln!("Why failed: {}", why);
-
-            let mut headers = HeaderMap::new();
-            headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
-            return Err((
+            return Err(ResponseBody::new(
                 StatusCode::BAD_REQUEST,
-                headers,
-                serde_json::to_string_pretty(&handlers::ErrorResponse::new(
+                None,
+                handlers::ErrorResponse::new(
                     ErrorTypes::InternalError,
                     "Could not fetch tasks",
-                ))
-                .unwrap(), // Should not panic, because struct is always valid for converting into JSON
+                ) // Should not panic, because struct is always valid for converting into JSON
             )
                 .into_response());
         }
@@ -160,8 +151,6 @@ pub async fn submit_task(
             // 12 // test user id (exists in table)
             // Since it aint working rn we comment it
             println!("Why: {}", why);
-            let mut headers = HeaderMap::new();
-            headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
             return Err(ResponseBody::new(
                 StatusCode::UNAUTHORIZED,
                 None,
@@ -179,8 +168,6 @@ pub async fn submit_task(
         Ok(task_type) => task_type,
         Err(why) => {
             eprintln!("Why: {}", why);
-            let mut headers = HeaderMap::new();
-            headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
             return Err(ResponseBody::new(
                 StatusCode::BAD_REQUEST,
                 None,
@@ -357,7 +344,7 @@ pub async fn task_progress(
                 .into_response());
         }
     };
-    let is_subscribe_to_course = false; // TODO: Validation (FORBIDDEN if doesnt own the course)
+    let _is_subscribe_to_course = false; // TODO: Validation (FORBIDDEN if doesnt own the course)
 
     match controllers::progress::get_task_progress(&state.pool, user_id, task_id).await {
         Ok(progress) => {
@@ -369,9 +356,6 @@ pub async fn task_progress(
         }
         Err(why) => {
             eprintln!("Could not get progress (handler): {}", why);
-            let mut headers = HeaderMap::new();
-            headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
-
             return Err(ResponseBody::new(
                 StatusCode::BAD_REQUEST,
                 None,

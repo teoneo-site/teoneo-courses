@@ -9,7 +9,7 @@ use gigalib::{
     controllers::client::{ClientBuilder, GigaClient},
     http::message::{MessageConfig, MessageConfigBuilder},
 };
-use handlers::ErrorTypes;
+use handlers::{ErrorTypes, ResponseBody};
 use sqlx::{mysql::MySqlPoolOptions, MySql, Pool};
 use tower_http::{
     catch_panic::{CatchPanic, CatchPanicLayer},
@@ -36,18 +36,13 @@ fn internal_server_error_handler(err: Box<dyn Any + Send + 'static>) -> Response
         "Unknown panic message".to_string()
     };
     println!("Internal server error catched: {}", details);
-
-    let mut headers = HeaderMap::new();
-    headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
-
-    (
+    ResponseBody::new(
         StatusCode::INTERNAL_SERVER_ERROR,
-        headers,
-        serde_json::to_string_pretty(&handlers::ErrorResponse::new(
+        None,
+        handlers::ErrorResponse::new(
             ErrorTypes::InternalError,
             &details,
-        ))
-        .unwrap(), // Should not panic, because struct is always valid for converting into JSON
+        )// Should not panic, because struct is always valid for converting into JSON
     )
         .into_response()
 }

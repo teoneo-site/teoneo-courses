@@ -91,23 +91,17 @@ pub async fn get_module(
                 .to_string()
             };
 
-            let mut headers = HeaderMap::new();
-            headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
-            return Ok((StatusCode::OK, headers, body).into_response());
+            return Ok(ResponseBody::new(StatusCode::OK, None, body).into_response());
         }
         Err(why) => {
             eprintln!("Why mo cock: {}", why);
-
-            let mut headers = HeaderMap::new();
-            headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
-            return Err((
+            return Err(ResponseBody::new(
                 StatusCode::BAD_REQUEST,
-                headers,
-                serde_json::to_string_pretty(&handlers::ErrorResponse::new(
+                None,
+                handlers::ErrorResponse::new(
                     ErrorTypes::InternalError,
                     "Could not fetch the module",
-                ))
-                .unwrap(), // Should not panic, because struct is always valid for converting into JSON
+                ) // Should not panic, because struct is always valid for converting into JSON
             )
                 .into_response());
         }
