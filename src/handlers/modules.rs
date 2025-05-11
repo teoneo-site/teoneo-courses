@@ -12,6 +12,8 @@ use crate::{
     AppState,
 };
 
+use super::ResponseBody;
+
 // PUBLCI GET /course/{course_id}/modules - Get info course's modules (id, course_id, title)
 pub async fn get_modules_for_course(
     State(state): State<AppState>,
@@ -32,26 +34,16 @@ pub async fn get_modules_for_course(
                     data_array.push(value);
                 }
             }
-
-            let mut headers = HeaderMap::new();
-            headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
-            return Ok((StatusCode::OK, headers, json.to_string()).into_response());
+            return Ok(ResponseBody::new(StatusCode::OK, None, json).into_response());
         }
         Err(why) => {
             eprintln!("Why mo: {}", why);
-
-            let mut headers = HeaderMap::new();
-            headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
-            return Err((
+            return Err(ResponseBody::new(
                 StatusCode::BAD_REQUEST,
-                headers,
-                serde_json::to_string_pretty(&handlers::ErrorResponse::new(
-                    &ErrorTypes::InternalError.to_string(),
-                    "Could not fetch modules",
-                ))
-                .unwrap(), // Should not panic, because struct is always valid for converting into JSON
+                None,
+                handlers::ErrorResponse::new(ErrorTypes::InternalError, "Could not fetch modules"),
             )
-                .into_response());
+            .into_response());
         }
     };
 }
@@ -61,14 +53,10 @@ pub async fn get_module(
     headers: HeaderMap,
     Path((course_id, module_id)): Path<(i32, i32)>,
 ) -> Result<Response, Response> {
-    let empty = HeaderValue::from_static("");
     let token = headers
         .get("Authorization")
-        .unwrap_or(&empty)
-        .to_str()
-        .unwrap_or("")
-        .split(" ")
-        .last()
+        .and_then(|value| value.to_str().ok())
+        .and_then(|s| s.split_whitespace().last())
         .unwrap_or("");
 
     let is_subscribed_to_course = match common::token::verify_jwt_token(token) {
@@ -116,7 +104,7 @@ pub async fn get_module(
                 StatusCode::BAD_REQUEST,
                 headers,
                 serde_json::to_string_pretty(&handlers::ErrorResponse::new(
-                    &ErrorTypes::InternalError.to_string(),
+                    ErrorTypes::InternalError,
                     "Could not fetch the module",
                 ))
                 .unwrap(), // Should not panic, because struct is always valid for converting into JSON

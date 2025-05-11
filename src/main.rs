@@ -44,7 +44,7 @@ fn internal_server_error_handler(err: Box<dyn Any + Send + 'static>) -> Response
         StatusCode::INTERNAL_SERVER_ERROR,
         headers,
         serde_json::to_string_pretty(&handlers::ErrorResponse::new(
-            &ErrorTypes::InternalError.to_string(),
+            ErrorTypes::InternalError,
             &details,
         ))
         .unwrap(), // Should not panic, because struct is always valid for converting into JSON

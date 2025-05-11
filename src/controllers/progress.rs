@@ -24,7 +24,7 @@ impl Display for ProgressStatus {
             Self::Eval => write!(f, "EVAL"),
             Self::Failed => write!(f, "FAILED"),
             Self::Success => write!(f, "SUCCESS"),
-            Self::MaxAttempts => write!(f, "MAX_ATTEMPTS")
+            Self::MaxAttempts => write!(f, "MAX_ATTEMPTS"),
         }
     }
 }
@@ -50,20 +50,30 @@ pub struct Progress {
     submission: serde_json::Value,
     score: f32,
     attempts: i32,
-    updated_at: DateTime<Utc>
+    updated_at: DateTime<Utc>,
 }
 
 impl Progress {
-    pub fn new(id: u32,
+    pub fn new(
+        id: u32,
         user_id: u32,
         task_id: i32,
         status: ProgressStatus,
         submission: serde_json::Value,
         score: f32,
         attempts: i32,
-        updated_at: DateTime<Utc>) 
-    -> Self {
-        Self { id, user_id, task_id, status, submission, score, attempts, updated_at }
+        updated_at: DateTime<Utc>,
+    ) -> Self {
+        Self {
+            id,
+            user_id,
+            task_id,
+            status,
+            submission,
+            score,
+            attempts,
+            updated_at,
+        }
     }
 }
 
@@ -81,7 +91,11 @@ pub async fn update_or_insert_status(
     Ok(())
 }
 
-pub async fn get_task_progress(pool: &MySqlPool, user_id: u32, task_id: i32) -> anyhow::Result<Progress> {
+pub async fn get_task_progress(
+    pool: &MySqlPool,
+    user_id: u32,
+    task_id: i32,
+) -> anyhow::Result<Progress> {
     let progress = db::progressdb::fetch_task_progress(pool, user_id, task_id).await?;
     Ok(progress)
 }

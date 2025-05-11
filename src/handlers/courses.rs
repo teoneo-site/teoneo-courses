@@ -8,7 +8,7 @@ use sqlx::MySqlPool;
 
 use crate::{
     controllers,
-    handlers::{self, ErrorTypes},
+    handlers::{self, ErrorTypes, ResponseBody},
     AppState,
 };
 
@@ -20,26 +20,18 @@ pub async fn get_all_courses(State(state): State<AppState>) -> Result<Response, 
                 "data": courses,
             })
             .to_string();
-            let mut headers = HeaderMap::new();
-            headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
 
-            return Ok((StatusCode::OK, headers, body).into_response());
+            return Ok(ResponseBody::new(StatusCode::OK, None, body).into_response());
         }
         Err(why) => {
             eprintln!("Why co: {}", why);
 
-            let mut headers = HeaderMap::new();
-            headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
-            return Err((
+            return Err(ResponseBody::new(
                 StatusCode::BAD_REQUEST,
-                headers,
-                serde_json::to_string_pretty(&handlers::ErrorResponse::new(
-                    &ErrorTypes::InternalError.to_string(),
-                    "Could not fetch courses",
-                ))
-                .unwrap(), // Should not panic, because struct is always valid for converting into JSON
+                None,
+                handlers::ErrorResponse::new(ErrorTypes::InternalError, "Could not fetch courses"),
             )
-                .into_response());
+            .into_response());
         }
     };
 }
@@ -55,25 +47,21 @@ pub async fn get_course(
                 "data": course,
             })
             .to_string();
-            let mut headers = HeaderMap::new();
-            headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
-            return Ok((StatusCode::OK, headers, body).into_response());
+
+            return Ok(ResponseBody::new(StatusCode::OK, None, body).into_response());
         }
         Err(why) => {
             eprintln!("Why co: {}", why);
 
-            let mut headers = HeaderMap::new();
-            headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
-            return Err((
+            return Err(ResponseBody::new(
                 StatusCode::BAD_REQUEST,
-                headers,
-                serde_json::to_string_pretty(&handlers::ErrorResponse::new(
-                    &ErrorTypes::InternalError.to_string(),
+                None,
+                handlers::ErrorResponse::new(
+                    ErrorTypes::InternalError,
                     "Could not fetch the course",
-                ))
-                .unwrap(), // Should not panic, because struct is always valid for converting into JSON
+                ),
             )
-                .into_response());
+            .into_response());
         }
     };
 }
