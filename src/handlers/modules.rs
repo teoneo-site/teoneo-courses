@@ -1,18 +1,15 @@
 use axum::{
     extract::{Path, State},
-    http::{header::CONTENT_TYPE, HeaderMap, HeaderValue, StatusCode},
+    http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
 };
 use serde_json::json;
-use sqlx::MySqlPool;
 
 use crate::{
     common, controllers,
     handlers::{self, ErrorTypes},
     AppState,
 };
-
-use super::ResponseBody;
 
 // PUBLCI GET /course/{course_id}/modules - Get info course's modules (id, course_id, title)
 pub async fn get_modules_for_course(
@@ -34,16 +31,18 @@ pub async fn get_modules_for_course(
                     data_array.push(value);
                 }
             }
-            return Ok(ResponseBody::new(StatusCode::OK, None, json).into_response());
+            return Ok((StatusCode::OK, axum::Json(json)).into_response());
         }
         Err(why) => {
-            eprintln!("Why mo: {}", why);
-            return Err(ResponseBody::new(
+            eprintln!("Why modules for course: {}", why);
+            return Err((
                 StatusCode::BAD_REQUEST,
-                None,
-                handlers::ErrorResponse::new(ErrorTypes::InternalError, "Could not fetch modules"),
+                axum::Json(handlers::ErrorResponse::new(
+                    ErrorTypes::InternalError,
+                    "Could not fetch modules",
+                )),
             )
-            .into_response());
+                .into_response());
         }
     };
 }
@@ -60,7 +59,7 @@ pub async fn get_module(
         .unwrap_or("");
 
     let is_subscribed_to_course = match common::token::verify_jwt_token(token) {
-        Ok(user_id) => {
+        Ok(_user_id) => {
             // Check ownership TODO: API for verifying ownership of a course
             true
         }
@@ -76,7 +75,6 @@ pub async fn get_module(
                 json!({
                     "data": module,
                 })
-                .to_string()
             } else {
                 let mut value: serde_json::Value =
                     serde_json::Value::Object(serde_json::Map::new());
@@ -88,20 +86,18 @@ pub async fn get_module(
                 json!({
                     "data": value
                 })
-                .to_string()
             };
 
-            return Ok(ResponseBody::new(StatusCode::OK, None, body).into_response());
+            return Ok((StatusCode::OK, axum::Json(body)).into_response());
         }
         Err(why) => {
             eprintln!("Why mo cock: {}", why);
-            return Err(ResponseBody::new(
+            return Err((
                 StatusCode::BAD_REQUEST,
-                None,
-                handlers::ErrorResponse::new(
+                axum::Json(handlers::ErrorResponse::new(
                     ErrorTypes::InternalError,
                     "Could not fetch the module",
-                ) // Should not panic, because struct is always valid for converting into JSON
+                )), // Should not panic, because struct is always valid for converting into JSON
             )
                 .into_response());
         }

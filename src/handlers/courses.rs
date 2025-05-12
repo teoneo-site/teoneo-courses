@@ -1,14 +1,13 @@
 use axum::{
     extract::{Path, State},
-    http::{header::CONTENT_TYPE, HeaderMap, HeaderValue, StatusCode},
+    http::StatusCode,
     response::{IntoResponse, Response},
 };
 use serde_json::json;
-use sqlx::MySqlPool;
 
 use crate::{
     controllers,
-    handlers::{self, ErrorTypes, ResponseBody},
+    handlers::{self, ErrorTypes},
     AppState,
 };
 
@@ -18,20 +17,21 @@ pub async fn get_all_courses(State(state): State<AppState>) -> Result<Response, 
         Ok(courses) => {
             let body = json!({
                 "data": courses,
-            })
-            .to_string();
+            });
 
-            return Ok(ResponseBody::new(StatusCode::OK, None, body).into_response());
+            return Ok((StatusCode::OK, axum::Json(body)).into_response());
         }
         Err(why) => {
             eprintln!("Why co: {}", why);
 
-            return Err(ResponseBody::new(
+            return Err((
                 StatusCode::BAD_REQUEST,
-                None,
-                handlers::ErrorResponse::new(ErrorTypes::InternalError, "Could not fetch courses"),
+                axum::Json(handlers::ErrorResponse::new(
+                    ErrorTypes::InternalError,
+                    "Could not fetch courses",
+                )),
             )
-            .into_response());
+                .into_response());
         }
     };
 }
@@ -45,23 +45,21 @@ pub async fn get_course(
         Ok(course) => {
             let body = json!({
                 "data": course,
-            })
-            .to_string();
+            });
 
-            return Ok(ResponseBody::new(StatusCode::OK, None, body).into_response());
+            return Ok((StatusCode::OK, axum::Json(body)).into_response());
         }
         Err(why) => {
             eprintln!("Why co: {}", why);
 
-            return Err(ResponseBody::new(
+            return Err((
                 StatusCode::BAD_REQUEST,
-                None,
-                handlers::ErrorResponse::new(
+                axum::Json(handlers::ErrorResponse::new(
                     ErrorTypes::InternalError,
                     "Could not fetch the course",
-                ),
+                )),
             )
-            .into_response());
+                .into_response());
         }
     };
 }

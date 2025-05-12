@@ -17,7 +17,7 @@ use crate::{
         task::{QuizUserAnswer, TaskType},
     },
     db,
-    handlers::{self, ErrorTypes, ResponseBody},
+    handlers::{self, ErrorTypes},
     AppState,
 };
 
@@ -31,7 +31,7 @@ pub async fn get_tasks_for_module(
         .and_then(|value| value.to_str().ok())
         .and_then(|s| s.split_whitespace().last())
         .unwrap_or("");
-    
+
     let _is_subscribed_to_course = match common::token::verify_jwt_token(token) {
         Ok(_user_id) => {
             // Check ownership TODO: API for verifying ownership of a course
@@ -40,14 +40,13 @@ pub async fn get_tasks_for_module(
         Err(why) => {
             // Since it aint working rn we comment it
             // false
-            // eprintln!("Why: {}", why);
-            return Err(ResponseBody::new(
+            eprintln!("Why: {}", why);
+            return Err((
                 StatusCode::UNAUTHORIZED,
-                None,
-                handlers::ErrorResponse::new(
+                axum::Json(handlers::ErrorResponse::new(
                     ErrorTypes::JwtTokenExpired,
                     "Token update requested",
-                )
+                )),
             )
                 .into_response());
         }
@@ -57,20 +56,18 @@ pub async fn get_tasks_for_module(
         Ok(tasks) => {
             let body = json!({
                 "data": tasks,
-            })
-            .to_string();
+            });
 
-            return Ok(ResponseBody::new(StatusCode::OK, None, body).into_response());
+            return Ok((StatusCode::OK, axum::Json(body)).into_response());
         }
         Err(why) => {
             eprintln!("Why failed: {}", why);
-            return Err(ResponseBody::new(
+            return Err((
                 StatusCode::BAD_REQUEST,
-                None,
-                handlers::ErrorResponse::new(
+                axum::Json(handlers::ErrorResponse::new(
                     ErrorTypes::InternalError,
                     "Could not fetch tasks",
-                ) // Should not panic, because struct is always valid for converting into JSON
+                )), // Should not panic, because struct is always valid for converting into JSON
             )
                 .into_response());
         }
@@ -80,7 +77,7 @@ pub async fn get_tasks_for_module(
 pub async fn get_task(
     State(state): State<AppState>,
     headers: HeaderMap,
-    Path((course_id, module_id, task_id)): Path<(i32, i32, i32)>,
+    Path((_course_id, module_id, task_id)): Path<(i32, i32, i32)>,
 ) -> Result<Response, Response> {
     let token = headers
         .get("Authorization")
@@ -88,8 +85,8 @@ pub async fn get_task(
         .and_then(|s| s.split_whitespace().last())
         .unwrap_or("");
 
-    let is_subscribed_to_course = match common::token::verify_jwt_token(token) {
-        Ok(user_id) => {
+    let _is_subscribed_to_course = match common::token::verify_jwt_token(token) {
+        Ok(_user_id) => {
             // Check ownership TODO: API for verifying ownership of a course
             true
         }
@@ -97,12 +94,14 @@ pub async fn get_task(
             // Since it aint working rn we comment it
             // false
             eprintln!("Why: {}", why);
-            return Err(ResponseBody::new(
+            return Err((
                 StatusCode::UNAUTHORIZED,
-                None,
-                handlers::ErrorResponse::new(ErrorTypes::JwtTokenExpired, "Token update requested"),
+                axum::Json(handlers::ErrorResponse::new(
+                    ErrorTypes::JwtTokenExpired,
+                    "Token update requested",
+                )),
             )
-            .into_response());
+                .into_response());
         }
     };
 
@@ -110,18 +109,19 @@ pub async fn get_task(
         Ok(task) => {
             let body = json!({
                 "data": task,
-            })
-            .to_string();
-            return Ok(ResponseBody::new(StatusCode::OK, None, body).into_response());
+            });
+            return Ok((StatusCode::OK, axum::Json(body)).into_response());
         }
         Err(why) => {
             eprintln!("Why task fetch one: {}", why);
-            return Err(ResponseBody::new(
+            return Err((
                 StatusCode::BAD_REQUEST,
-                None,
-                handlers::ErrorResponse::new(ErrorTypes::InternalError, "Could not fetch the task"), 
+                axum::Json(handlers::ErrorResponse::new(
+                    ErrorTypes::InternalError,
+                    "Could not fetch the task",
+                )),
             )
-            .into_response());
+                .into_response());
         }
     };
 }
@@ -151,13 +151,12 @@ pub async fn submit_task(
             // 12 // test user id (exists in table)
             // Since it aint working rn we comment it
             println!("Why: {}", why);
-            return Err(ResponseBody::new(
+            return Err((
                 StatusCode::UNAUTHORIZED,
-                None,
-                handlers::ErrorResponse::new(
+                axum::Json(handlers::ErrorResponse::new(
                     ErrorTypes::JwtTokenExpired,
                     "Token update requested",
-                )
+                )),
             )
                 .into_response());
         }
@@ -168,13 +167,12 @@ pub async fn submit_task(
         Ok(task_type) => task_type,
         Err(why) => {
             eprintln!("Why: {}", why);
-            return Err(ResponseBody::new(
+            return Err((
                 StatusCode::BAD_REQUEST,
-                None,
-                handlers::ErrorResponse::new(
+                axum::Json(handlers::ErrorResponse::new(
                     ErrorTypes::InternalError,
                     "Could not fetch the task type. Task doesnt exist",
-                ), // Should not panic, because struct is always valid for converting into JSON
+                )), // Should not panic, because struct is always valid for converting into JSON
             )
                 .into_response());
         }
@@ -250,13 +248,12 @@ pub async fn submit_task(
 
             if attempts >= max_attemps {
                 // Signal using 400 that max attempts is hit
-                return Err(ResponseBody::new(
+                return Err((
                     StatusCode::BAD_REQUEST,
-                    None,
-                    handlers::ErrorResponse::new(
+                    axum::Json(handlers::ErrorResponse::new(
                         ErrorTypes::MaxAttemptsSubmit,
                         "Try again later",
-                    ) // Should not panic, because struct is always valid for converting into JSON
+                    )), // Should not panic, because struct is always valid for converting into JSON
                 )
                     .into_response());
             }
@@ -318,7 +315,7 @@ pub async fn submit_task(
 pub async fn task_progress(
     State(state): State<AppState>,
     headers: HeaderMap,
-    Path((course_id, module_id, task_id)): Path<(i32, i32, i32)>,
+    Path((_course_id, _module_id, task_id)): Path<(i32, i32, i32)>,
 ) -> Result<Response, Response> {
     let token = headers
         .get("Authorization")
@@ -333,13 +330,12 @@ pub async fn task_progress(
             // 6 // test user id (exists in table)
             // Since it aint working rn we comment it
             println!("Why: {}", why);
-            return Err(ResponseBody::new(
+            return Err((
                 StatusCode::UNAUTHORIZED,
-                None,
-                handlers::ErrorResponse::new(
+                axum::Json(handlers::ErrorResponse::new(
                     ErrorTypes::JwtTokenExpired,
                     "Token update requested",
-                )
+                )),
             )
                 .into_response());
         }
@@ -350,19 +346,17 @@ pub async fn task_progress(
         Ok(progress) => {
             let body = json!({
                 "data": progress
-            })
-            .to_string();
-            return Ok(ResponseBody::new(StatusCode::OK, None, body).into_response());
+            });
+            return Ok((StatusCode::OK, axum::Json(body)).into_response());
         }
         Err(why) => {
             eprintln!("Could not get progress (handler): {}", why);
-            return Err(ResponseBody::new(
+            return Err((
                 StatusCode::BAD_REQUEST,
-                None,
-                handlers::ErrorResponse::new(
+                axum::Json(handlers::ErrorResponse::new(
                     ErrorTypes::InternalError,
                     "Could not fetch the task progress",
-                ) // Should not panic, because struct is always valid for converting into JSON
+                )), // Should not panic, because struct is always valid for converting into JSON
             )
                 .into_response());
         }

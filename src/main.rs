@@ -1,7 +1,7 @@
 use std::{any::Any, time::Duration};
 
 use axum::{
-    http::{header::CONTENT_TYPE, HeaderMap, HeaderValue, StatusCode},
+    http::StatusCode,
     response::{IntoResponse, Response},
     Router,
 };
@@ -9,12 +9,9 @@ use gigalib::{
     controllers::client::{ClientBuilder, GigaClient},
     http::message::{MessageConfig, MessageConfigBuilder},
 };
-use handlers::{ErrorTypes, ResponseBody};
+use handlers::ErrorTypes;
 use sqlx::{mysql::MySqlPoolOptions, MySql, Pool};
-use tower_http::{
-    catch_panic::{CatchPanic, CatchPanicLayer},
-    cors::CorsLayer,
-};
+use tower_http::{catch_panic::CatchPanicLayer, cors::CorsLayer};
 
 mod common;
 mod controllers;
@@ -36,13 +33,12 @@ fn internal_server_error_handler(err: Box<dyn Any + Send + 'static>) -> Response
         "Unknown panic message".to_string()
     };
     println!("Internal server error catched: {}", details);
-    ResponseBody::new(
+    (
         StatusCode::INTERNAL_SERVER_ERROR,
-        None,
-        handlers::ErrorResponse::new(
+        axum::Json(handlers::ErrorResponse::new(
             ErrorTypes::InternalError,
             &details,
-        )// Should not panic, because struct is always valid for converting into JSON
+        )), // Should not panic, because struct is always valid for converting into JSON
     )
         .into_response()
 }
