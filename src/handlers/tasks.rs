@@ -81,10 +81,9 @@ pub async fn get_task(
         }
         Err(why) => {
             eprintln!("Why task fetch one: {}", why);
-            return Err(ResponseBody::new(
+            return Err((
                 StatusCode::INTERNAL_SERVER_ERROR,
-                None,
-                handlers::ErrorResponse::new(ErrorTypes::InternalError, "Could not fetch the task"), 
+                axum::Json(handlers::ErrorResponse::new(ErrorTypes::InternalError, "Could not fetch the task")), 
             )
                 .into_response());
         }

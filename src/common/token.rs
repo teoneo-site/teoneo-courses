@@ -1,10 +1,6 @@
-<<<<<<< Updated upstream
-use jsonwebtoken::{decode, DecodingKey, Validation};
-=======
 use axum::{extract::FromRequestParts, http::StatusCode, response::{IntoResponse, Response}};
 use chrono::{Duration, Utc};
 use jsonwebtoken::{decode, DecodingKey, EncodingKey, Header, Validation};
->>>>>>> Stashed changes
 use serde::{Deserialize, Serialize};
 
 use crate::handlers::{ErrorResponse, ErrorTypes};
@@ -15,10 +11,6 @@ pub struct Claims {
     pub exp: i64,
 }
 
-<<<<<<< Updated upstream
-// pub fn verify_refresh_token(token: &str) -> anyhow::Result<u32> {
-//     let validation = Validation::default();
-=======
 impl<S: std::marker::Sync> FromRequestParts<S> for Claims {
     type Rejection = Response;
 
@@ -52,19 +44,6 @@ impl<S: std::marker::Sync> FromRequestParts<S> for Claims {
     }
 }
 
-
-
-pub fn verify_refresh_token(token: &str) -> anyhow::Result<u32> {
-    let validation = Validation::default();
->>>>>>> Stashed changes
-
-//     let claims = decode::<Claims>(
-//         token,
-//         &DecodingKey::from_secret(std::env::var("SECRET_WORD_REFRESH").unwrap().as_ref()),
-//         &validation,
-//     )?;
-//     Ok(claims.claims.id)
-// }
 
 pub fn verify_jwt_token(token: &str) -> anyhow::Result<u32> {
     let validation = Validation::default();
