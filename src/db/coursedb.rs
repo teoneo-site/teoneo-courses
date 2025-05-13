@@ -46,7 +46,7 @@ pub async fn fetch_course(pool: &MySqlPool, id: i32) -> anyhow::Result<CourseInf
 }
 
 pub async fn validate_course_ownership(pool: &MySqlPool, user_id: i32, course_id: i32) -> anyhow::Result<bool> {
-    let row = sqlx::query("SELECT COUNT(*) FROM payments_history WHERE user_id = ? AND course_id = ?")
+    let row = sqlx::query("SELECT * FROM payments_history WHERE user_id = ? AND course_id = ?")
         .bind(user_id)
         .bind(course_id)
         .fetch_one(pool).await?;
