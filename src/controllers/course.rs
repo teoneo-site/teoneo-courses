@@ -45,3 +45,7 @@ pub async fn get_course(pool: &MySqlPool, id: i32) -> anyhow::Result<CourseInfo>
     let course = db::coursedb::fetch_course(pool, id).await?;
     Ok(course)
 }
+
+pub async fn verify_ownership(pool: &MySqlPool, user_id: i32, course_id: i32) -> anyhow::Result<bool> {
+    Ok(db::coursedb::validate_course_ownership(pool, user_id, course_id).await?)
+}

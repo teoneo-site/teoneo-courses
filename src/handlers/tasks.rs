@@ -1,16 +1,17 @@
 use std::i32;
 
 use axum::{
-    extract::{Path, State},
+    extract::{FromRequestParts, Path, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     Json,
 };
+use jsonwebtoken::{decode, DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::{
-    common,
+    common::{self, token::Claims},
     controllers::{
         self,
         progress::ProgressStatus,
@@ -21,36 +22,21 @@ use crate::{
     AppState,
 };
 
+use super::ErrorResponse;
+
+
 pub async fn get_tasks_for_module(
     State(state): State<AppState>,
-    headers: HeaderMap,
-    Path((_course_id, module_id)): Path<(i32, i32)>,
+    claims: Claims,
+    Path((course_id, module_id)): Path<(i32, i32)>,
 ) -> Result<Response, Response> {
-    let token = headers
-        .get("Authorization")
-        .and_then(|value| value.to_str().ok())
-        .and_then(|s| s.split_whitespace().last())
-        .unwrap_or("");
-
-    let _is_subscribed_to_course = match common::token::verify_jwt_token(token) {
-        Ok(_user_id) => {
-            // Check ownership TODO: API for verifying ownership of a course
-            true
+    match controllers::course::verify_ownership(&state.pool, claims.id as i32, course_id).await {
+        Ok(val) if val == true => {}, // if does own nothing happens, just go on
+        Err(_) | Ok(_) => { // Does not own the course
+            // eprintln!("Could not verify course ownership {}", why);
+            return Err((StatusCode::FORBIDDEN, axum::Json(ErrorResponse::new(ErrorTypes::CourseNotOwned, "User does not own this course"))).into_response())
         }
-        Err(why) => {
-            // Since it aint working rn we comment it
-            // false
-            eprintln!("Why: {}", why);
-            return Err((
-                StatusCode::UNAUTHORIZED,
-                axum::Json(handlers::ErrorResponse::new(
-                    ErrorTypes::JwtTokenExpired,
-                    "Token update requested",
-                )),
-            )
-                .into_response());
-        }
-    };
+    }
 
     match controllers::task::get_tasks_for_module(&state.pool, module_id).await {
         Ok(tasks) => {
@@ -76,35 +62,16 @@ pub async fn get_tasks_for_module(
 
 pub async fn get_task(
     State(state): State<AppState>,
-    headers: HeaderMap,
-    Path((_course_id, module_id, task_id)): Path<(i32, i32, i32)>,
+    claims: Claims,
+    Path((course_id, module_id, task_id)): Path<(i32, i32, i32)>,
 ) -> Result<Response, Response> {
-    let token = headers
-        .get("Authorization")
-        .and_then(|value| value.to_str().ok())
-        .and_then(|s| s.split_whitespace().last())
-        .unwrap_or("");
-
-    let _is_subscribed_to_course = match common::token::verify_jwt_token(token) {
-        Ok(_user_id) => {
-            // Check ownership TODO: API for verifying ownership of a course
-            true
+    match controllers::course::verify_ownership(&state.pool, claims.id as i32, course_id).await {
+        Ok(val) if val == true => {}, // if does own nothing happens, just go on
+        Err(_) | Ok(_) => { // Does not own the course
+            // eprintln!("Could not verify course ownership {}", why);
+            return Err((StatusCode::FORBIDDEN, axum::Json(ErrorResponse::new(ErrorTypes::CourseNotOwned, "User does not own this course"))).into_response())
         }
-        Err(why) => {
-            // Since it aint working rn we comment it
-            // false
-            eprintln!("Why: {}", why);
-            return Err((
-                StatusCode::UNAUTHORIZED,
-                axum::Json(handlers::ErrorResponse::new(
-                    ErrorTypes::JwtTokenExpired,
-                    "Token update requested",
-                )),
-            )
-                .into_response());
-        }
-    };
-
+    }
     match controllers::task::get_task(&state.pool, module_id, task_id).await {
         Ok(task) => {
             let body = json!({
@@ -114,12 +81,10 @@ pub async fn get_task(
         }
         Err(why) => {
             eprintln!("Why task fetch one: {}", why);
-            return Err((
-                StatusCode::BAD_REQUEST,
-                axum::Json(handlers::ErrorResponse::new(
-                    ErrorTypes::InternalError,
-                    "Could not fetch the task",
-                )),
+            return Err(ResponseBody::new(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                None,
+                handlers::ErrorResponse::new(ErrorTypes::InternalError, "Could not fetch the task"), 
             )
                 .into_response());
         }
@@ -134,34 +99,17 @@ pub struct SubmitPayload {
 // POST /course/.../modules/.../tasks/.../submit
 pub async fn submit_task(
     State(state): State<AppState>,
-    headers: HeaderMap,
-    Path((_course_id, _module_id, task_id)): Path<(i32, i32, i32)>, // We dont really need module_id tho, just course (not necessary and)
+    claims: Claims,
+    Path((course_id, _module_id, task_id)): Path<(i32, i32, i32)>, // We dont really need module_id tho, just course (not necessary and)
     Json(user_answers): Json<serde_json::Value>,
 ) -> Result<Response, Response> {
-    let token = headers
-        .get("Authorization")
-        .and_then(|value| value.to_str().ok())
-        .and_then(|s| s.split_whitespace().last())
-        .unwrap_or("");
-
-    let user_id = match common::token::verify_jwt_token(token) {
-        // TODO: Move to utilities (it repeats a lot)
-        Ok(user_id) => user_id,
-        Err(why) => {
-            // 12 // test user id (exists in table)
-            // Since it aint working rn we comment it
-            println!("Why: {}", why);
-            return Err((
-                StatusCode::UNAUTHORIZED,
-                axum::Json(handlers::ErrorResponse::new(
-                    ErrorTypes::JwtTokenExpired,
-                    "Token update requested",
-                )),
-            )
-                .into_response());
+    match controllers::course::verify_ownership(&state.pool, claims.id as i32, course_id).await {
+        Ok(val) if val == true => {}, // if does own nothing happens, just go on
+        Err(_) | Ok(_) => { // Does not own the course
+            // eprintln!("Could not verify course ownership {}", why);
+            return Err((StatusCode::FORBIDDEN, axum::Json(ErrorResponse::new(ErrorTypes::CourseNotOwned, "User does not own this course"))).into_response())
         }
-    };
-    let _is_subscribe_to_course = false; // TODO: Validation
+    }
 
     let task_type = match db::taskdb::fetch_task_type(&state.pool, task_id).await {
         Ok(task_type) => task_type,
@@ -182,7 +130,7 @@ pub async fn submit_task(
     // Frontend can query status at this point
     controllers::progress::update_or_insert_status(
         &state.pool,
-        user_id,
+        claims.id,
         task_id,
         ProgressStatus::Eval,
         "".to_string(),
@@ -214,7 +162,7 @@ pub async fn submit_task(
             {
                 controllers::progress::update_or_insert_status(
                     &state.pool,
-                    user_id,
+                    claims.id,
                     task_id,
                     ProgressStatus::Failed,
                     serde_json::to_string(&user_answers).unwrap(),
@@ -227,7 +175,7 @@ pub async fn submit_task(
                 // Set status to SUCCESSS, submission to user_answers, score to 1.0, attempts to 1 if exists + 1
                 controllers::progress::update_or_insert_status(
                     &state.pool,
-                    user_id,
+                    claims.id,
                     task_id,
                     ProgressStatus::Success,
                     serde_json::to_string(&user_answers).unwrap(),
@@ -242,7 +190,7 @@ pub async fn submit_task(
         }
         TaskType::Prompt => {
             let (attempts, max_attemps) =
-                db::progressdb::get_prompt_task_attemps(&state.pool, user_id, task_id) // Task is supposed to be prompt 100% at this point
+                db::progressdb::get_prompt_task_attemps(&state.pool, claims.id, task_id) // Task is supposed to be prompt 100% at this point
                     .await
                     .unwrap(); // So unwrap() should not panic
 
@@ -290,7 +238,7 @@ pub async fn submit_task(
 
                 controllers::progress::update_or_insert_status(
                     &pool,
-                    user_id,
+                    claims.id,
                     task_id,
                     if score < 0.4 {
                         ProgressStatus::Failed
@@ -314,34 +262,17 @@ pub async fn submit_task(
 // GET /course/.../modules/.../tasks/.../progress
 pub async fn task_progress(
     State(state): State<AppState>,
-    headers: HeaderMap,
-    Path((_course_id, _module_id, task_id)): Path<(i32, i32, i32)>,
+    claims: Claims,
+    Path((course_id, module_id, task_id)): Path<(i32, i32, i32)>,
 ) -> Result<Response, Response> {
-    let token = headers
-        .get("Authorization")
-        .and_then(|value| value.to_str().ok())
-        .and_then(|s| s.split_whitespace().last())
-        .unwrap_or("");
-
-    let user_id = match common::token::verify_jwt_token(token) {
-        // TODO: Move to utilities (it repeats a lot)
-        Ok(user_id) => user_id,
-        Err(why) => {
-            // 6 // test user id (exists in table)
-            // Since it aint working rn we comment it
-            println!("Why: {}", why);
-            return Err((
-                StatusCode::UNAUTHORIZED,
-                axum::Json(handlers::ErrorResponse::new(
-                    ErrorTypes::JwtTokenExpired,
-                    "Token update requested",
-                )),
-            )
-                .into_response());
+    let user_id = claims.id;
+    match controllers::course::verify_ownership(&state.pool, claims.id as i32, course_id).await {
+        Ok(val) if val == true => {}, // if does own nothing happens, just go on
+        Err(_) | Ok(_) => { // Does not own the course
+            // eprintln!("Could not verify course ownership {}", why);
+            return Err((StatusCode::FORBIDDEN, axum::Json(ErrorResponse::new(ErrorTypes::CourseNotOwned, "User does not own this course"))).into_response())
         }
-    };
-    let _is_subscribe_to_course = false; // TODO: Validation (FORBIDDEN if doesnt own the course)
-
+    }
     match controllers::progress::get_task_progress(&state.pool, user_id, task_id).await {
         Ok(progress) => {
             let body = json!({

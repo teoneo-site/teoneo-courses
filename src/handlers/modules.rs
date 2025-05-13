@@ -6,9 +6,7 @@ use axum::{
 use serde_json::json;
 
 use crate::{
-    common, controllers,
-    handlers::{self, ErrorTypes},
-    AppState,
+    common::{self, token::Claims}, controllers, db, handlers::{self, ErrorTypes}, AppState
 };
 
 // PUBLCI GET /course/{course_id}/modules - Get info course's modules (id, course_id, title)
@@ -34,13 +32,10 @@ pub async fn get_modules_for_course(
             return Ok((StatusCode::OK, axum::Json(json)).into_response());
         }
         Err(why) => {
-            eprintln!("Why modules for course: {}", why);
+            eprintln!("Why mo: {}", why);
             return Err((
-                StatusCode::BAD_REQUEST,
-                axum::Json(handlers::ErrorResponse::new(
-                    ErrorTypes::InternalError,
-                    "Could not fetch modules",
-                )),
+                StatusCode::INTERNAL_SERVER_ERROR,
+                axum::Json(handlers::ErrorResponse::new(ErrorTypes::InternalError, "Could not fetch modules")),
             )
                 .into_response());
         }
@@ -49,23 +44,14 @@ pub async fn get_modules_for_course(
 
 pub async fn get_module(
     State(state): State<AppState>,
-    headers: HeaderMap,
+    claims: Claims,
     Path((course_id, module_id)): Path<(i32, i32)>,
 ) -> Result<Response, Response> {
-    let token = headers
-        .get("Authorization")
-        .and_then(|value| value.to_str().ok())
-        .and_then(|s| s.split_whitespace().last())
-        .unwrap_or("");
-
-    let is_subscribed_to_course = match common::token::verify_jwt_token(token) {
-        Ok(_user_id) => {
-            // Check ownership TODO: API for verifying ownership of a course
-            true
-        }
+    let is_subscribed_to_course = match controllers::course::verify_ownership(&state.pool, claims.id as i32, course_id).await {
+        Ok(val) => val,
         Err(why) => {
-            eprintln!("Why mo kilka: {}", why);
-            false // If user isnt logged in its okay, he'll see public part of the module
+            eprintln!("Why ver ownership failed: {}", why);
+            false // user will see public part of the module
         }
     };
 
@@ -93,7 +79,7 @@ pub async fn get_module(
         Err(why) => {
             eprintln!("Why mo cock: {}", why);
             return Err((
-                StatusCode::BAD_REQUEST,
+                StatusCode::INTERNAL_SERVER_ERROR,
                 axum::Json(handlers::ErrorResponse::new(
                     ErrorTypes::InternalError,
                     "Could not fetch the module",

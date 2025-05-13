@@ -27,6 +27,7 @@ pub enum ErrorTypes {
     InternalError,
     JwtTokenExpired,
     MaxAttemptsSubmit,
+    CourseNotOwned
 }
 
 impl Display for ErrorTypes {
@@ -35,6 +36,7 @@ impl Display for ErrorTypes {
             Self::InternalError => write!(f, "server_internal_error"),
             Self::JwtTokenExpired => write!(f, "jwt_token_expired"),
             Self::MaxAttemptsSubmit => write!(f, "max_attempts_submit"),
+            Self::CourseNotOwned => write!(f, "course_not_owned"),
         }
     }
 }
