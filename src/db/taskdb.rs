@@ -11,9 +11,7 @@ pub async fn fetch_tasks_for_module(
     module_id: i32,
     user_id: Option<i32>,
 ) -> anyhow::Result<Vec<TaskShortInfo>> {
-    // SELECT t.id, t.title, t.type, tp.score FROM tasks t LEFT JOIN task_progress tp ON tp.task_id = t.id AND tp.user_id = 12 WHERE t.module_id = 11
     let rows = if let Some(user_id) = user_id {
-        println!("dfdfdsds");
         sqlx::query("SELECT t.id, t.title, t.type, tp.status AS status FROM tasks t LEFT JOIN task_progress tp ON tp.task_id = t.id AND tp.user_id = ? WHERE t.module_id = ?")
         .bind(user_id)
         .bind(module_id)
@@ -79,21 +77,7 @@ pub async fn fetch_task_answers(
     let answers: String = row.try_get(0)?;
     Ok(answers)
 }
-/* 
-SELECT t.title, t.type,
-            q.question as qquestion, q.possible_answers, q.is_multiple,
-            l.text, l.picture_url, l.video_url,
-            m.question, m.left_items, m.right_items, m.picture_url,
-            p.question as pquestion, p.picture_url, p.max_attempts,
-            pr.status, pr.score
-    FROM tasks t
-    LEFT JOIN quizzes q ON t.id = q.task_id AND t.type = 'Quiz'
-    LEFT JOIN lectures l ON t.id = l.task_id AND t.type = 'Lecture'
-    LEFT JOIN matches m ON t.id = m.task_id AND t.type = 'Match'
-    LEFT JOIN prompts p on t.id = p.task_id AND t.type = 'prompt'
-    LEFT JOIN task_progress pr ON pr.task_id = t.id AND pr.user_id = ?
-    WHERE t.id = ?;
-*/
+
 pub async fn fetch_task(pool: &MySqlPool, module_id: i32, task_id: i32, user_id: Option<i32>) -> anyhow::Result<Task> {
     let row = if let Some(user_id) = user_id { 
         sqlx::query("SELECT 
