@@ -98,7 +98,9 @@ pub struct Task {
     pub title: String,
     pub task_type: TaskType,
     pub content: serde_json::Value, // содержимое задания
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<ProgressStatus>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub score: Option<f32>,
 }
 
