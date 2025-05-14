@@ -6,6 +6,7 @@ use axum::{
     response::{IntoResponse, Response},
     Json,
 };
+use axum_extra::extract::OptionalQuery;
 use jsonwebtoken::{decode, DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -24,12 +25,18 @@ use crate::{
 
 use super::ErrorResponse;
 
+#[derive(Serialize, Deserialize)]
+pub struct StatusQueryOptional {
+    with_status: bool,
+}
 
 pub async fn get_tasks_for_module(
     State(state): State<AppState>,
+    OptionalQuery(query_data) : OptionalQuery<StatusQueryOptional>, 
     claims: Claims,
     Path((course_id, module_id)): Path<(i32, i32)>,
 ) -> Result<Response, Response> {
+    let user_id = claims.id as i32;
     match controllers::course::verify_ownership(&state.pool, claims.id as i32, course_id).await {
         Ok(val) if val == true => {}, // if does own nothing happens, just go on
         Err(_) | Ok(_) => { // Does not own the course
@@ -38,7 +45,7 @@ pub async fn get_tasks_for_module(
         }
     }
 
-    match controllers::task::get_tasks_for_module(&state.pool, module_id).await {
+    match controllers::task::get_tasks_for_module(&state.pool, module_id, if query_data.unwrap_or(StatusQueryOptional { with_status: false }).with_status {user_id.into()} else {None}).await {
         Ok(tasks) => {
             let body = json!({
                 "data": tasks,
@@ -60,11 +67,18 @@ pub async fn get_tasks_for_module(
     };
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct ProgressQueryOptional {
+    with_progress: bool,
+}
+
 pub async fn get_task(
     State(state): State<AppState>,
+    OptionalQuery(query_data) : OptionalQuery<ProgressQueryOptional>,
     claims: Claims,
     Path((course_id, module_id, task_id)): Path<(i32, i32, i32)>,
 ) -> Result<Response, Response> {
+    let user_id = claims.id as i32;
     match controllers::course::verify_ownership(&state.pool, claims.id as i32, course_id).await {
         Ok(val) if val == true => {}, // if does own nothing happens, just go on
         Err(_) | Ok(_) => { // Does not own the course
@@ -72,7 +86,7 @@ pub async fn get_task(
             return Err((StatusCode::FORBIDDEN, axum::Json(ErrorResponse::new(ErrorTypes::CourseNotOwned, "User does not own this course"))).into_response())
         }
     }
-    match controllers::task::get_task(&state.pool, module_id, task_id).await {
+    match controllers::task::get_task(&state.pool, module_id, task_id, if query_data.unwrap_or(ProgressQueryOptional { with_progress: false }).with_progress {user_id.into()} else {None}).await {
         Ok(task) => {
             let body = json!({
                 "data": task,
@@ -277,6 +291,7 @@ pub async fn task_progress(
             let body = json!({
                 "data": progress
             });
+
             return Ok((StatusCode::OK, axum::Json(body)).into_response());
         }
         Err(why) => {

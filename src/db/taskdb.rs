@@ -1,6 +1,7 @@
 use sqlx::MySqlPool;
 use sqlx::Row;
 
+use crate::controllers::progress::ProgressStatus;
 use crate::controllers::task::Task;
 use crate::controllers::task::TaskShortInfo;
 use crate::controllers::task::TaskType;
@@ -8,20 +9,35 @@ use crate::controllers::task::TaskType;
 pub async fn fetch_tasks_for_module(
     pool: &MySqlPool,
     module_id: i32,
+    user_id: Option<i32>,
 ) -> anyhow::Result<Vec<TaskShortInfo>> {
-    let rows = sqlx::query("SELECT id, title, type FROM tasks WHERE module_id = ?") // Todo: Pagination with LIMIT
+    // SELECT t.id, t.title, t.type, tp.score FROM tasks t LEFT JOIN task_progress tp ON tp.task_id = t.id AND tp.user_id = 12 WHERE t.module_id = 11
+    let rows = if let Some(user_id) = user_id {
+        println!("dfdfdsds");
+        sqlx::query("SELECT t.id, t.title, t.type, tp.status AS status FROM tasks t LEFT JOIN task_progress tp ON tp.task_id = t.id AND tp.user_id = ? WHERE t.module_id = ?")
+        .bind(user_id)
         .bind(module_id)
         .fetch_all(pool)
-        .await?;
-
+        .await?
+    } else {
+        sqlx::query("SELECT id, title, type FROM tasks WHERE module_id = ?") // Todo: Pagination with LIMIT
+        .bind(module_id)
+        .fetch_all(pool)
+        .await?
+    };
     let mut result = Vec::new(); // Vec of Courses
 
     for row in rows {
         let id: i32 = row.try_get("id")?;
         let title: String = row.try_get("title")?;
         let task_type: TaskType = row.try_get::<String, _>("type")?.into();
-
-        result.push(TaskShortInfo::new(id, module_id, title, task_type));
+        let status: Option<ProgressStatus> = row
+            .try_get::<Option<String>, _>("status")
+            .map(|opt| opt.map(Into::into))
+            .map_err(|_| ())
+            .ok()
+            .flatten();
+        result.push(TaskShortInfo::new(id, module_id, title, task_type, status));
     }
 
     Ok(result)
@@ -63,26 +79,71 @@ pub async fn fetch_task_answers(
     let answers: String = row.try_get(0)?;
     Ok(answers)
 }
-
-pub async fn fetch_task(pool: &MySqlPool, module_id: i32, task_id: i32) -> anyhow::Result<Task> {
-    let row = sqlx::query("SELECT t.title, t.type,
-                                             q.question as qquestion, q.possible_answers, q.is_multiple,
-                                             l.text, l.picture_url, l.video_url,
-                                             m.question, m.left_items, m.right_items, m.picture_url,
-                                             p.question as pquestion, p.picture_url, p.max_attempts
-                                      FROM tasks t
-                                      LEFT JOIN quizzes q ON t.id = q.task_id AND t.type = 'Quiz'
-                                      LEFT JOIN lectures l ON t.id = l.task_id AND t.type = 'Lecture'
-                                      LEFT JOIN matches m ON t.id = m.task_id AND t.type = 'Match'
-                                      LEFT JOIN prompts p on t.id = p.task_id AND t.type = 'prompt'
-                                      WHERE t.id = ?")
+/* 
+SELECT t.title, t.type,
+            q.question as qquestion, q.possible_answers, q.is_multiple,
+            l.text, l.picture_url, l.video_url,
+            m.question, m.left_items, m.right_items, m.picture_url,
+            p.question as pquestion, p.picture_url, p.max_attempts,
+            pr.status, pr.score
+    FROM tasks t
+    LEFT JOIN quizzes q ON t.id = q.task_id AND t.type = 'Quiz'
+    LEFT JOIN lectures l ON t.id = l.task_id AND t.type = 'Lecture'
+    LEFT JOIN matches m ON t.id = m.task_id AND t.type = 'Match'
+    LEFT JOIN prompts p on t.id = p.task_id AND t.type = 'prompt'
+    LEFT JOIN task_progress pr ON pr.task_id = t.id AND pr.user_id = ?
+    WHERE t.id = ?;
+*/
+pub async fn fetch_task(pool: &MySqlPool, module_id: i32, task_id: i32, user_id: Option<i32>) -> anyhow::Result<Task> {
+    let row = if let Some(user_id) = user_id { 
+        sqlx::query("SELECT 
+            t.title, t.type,
+            q.question as qquestion, q.possible_answers, q.is_multiple,
+            l.text, l.picture_url, l.video_url,
+            m.question, m.left_items, m.right_items, m.picture_url,
+            p.question as pquestion, p.picture_url, p.max_attempts,
+            pr.status, pr.score
+            FROM tasks t
+                LEFT JOIN quizzes q ON t.id = q.task_id AND t.type = 'Quiz'
+                LEFT JOIN lectures l ON t.id = l.task_id AND t.type = 'Lecture'
+                LEFT JOIN matches m ON t.id = m.task_id AND t.type = 'Match'
+                LEFT JOIN prompts p on t.id = p.task_id AND t.type = 'prompt'
+                LEFT JOIN task_progress pr ON pr.task_id = t.id AND pr.user_id = ?
+            WHERE t.id = ?")
+        .bind(user_id)
         .bind(task_id)
         .fetch_one(pool)
-        .await?;
+        .await?
+    } else {
+        sqlx::query("SELECT t.title, t.type,
+                    q.question as qquestion, q.possible_answers, q.is_multiple,
+                    l.text, l.picture_url, l.video_url,
+                    m.question, m.left_items, m.right_items, m.picture_url,
+                    p.question as pquestion, p.picture_url, p.max_attempts
+            FROM tasks t
+                LEFT JOIN quizzes q ON t.id = q.task_id AND t.type = 'Quiz'
+                LEFT JOIN lectures l ON t.id = l.task_id AND t.type = 'Lecture'
+                LEFT JOIN matches m ON t.id = m.task_id AND t.type = 'Match'
+                LEFT JOIN prompts p on t.id = p.task_id AND t.type = 'prompt'
+            WHERE t.id = ?")
+        .bind(task_id)
+        .fetch_one(pool)
+        .await?
+    };
 
     let title: String = row.try_get("title")?;
     let task_type_str: String = row.try_get("type")?;
     let task_type: TaskType = task_type_str.into();
+    let status: Option<ProgressStatus> = row
+        .try_get::<Option<String>, _>("status")
+        .map(|opt| opt.map(Into::into))
+        .map_err(|_| ())
+        .ok()
+        .flatten();
+    let score: Option<f32> = row
+        .try_get::<Option<f32>, _>("score").map_err(|_| ())
+        .ok()
+        .flatten();
 
     let content = match task_type {
         TaskType::Quiz => {
@@ -134,7 +195,7 @@ pub async fn fetch_task(pool: &MySqlPool, module_id: i32, task_id: i32) -> anyho
         }
     };
 
-    Ok(Task::new(task_id, module_id, title, task_type, content))
+    Ok(Task::new(task_id, module_id, title, task_type, content, status, score))
 }
 
 pub async fn fetch_prompt_details(

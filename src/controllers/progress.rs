@@ -6,15 +6,15 @@ use sqlx::MySqlPool;
 
 use crate::db;
 
-#[derive(Serialize, Deserialize, PartialEq)]
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub enum ProgressStatus {
-    #[serde(alias = "EVAL")]
+    #[serde(rename = "EVAL")]
     Eval,
-    #[serde(alias = "FAILED")]
+    #[serde(rename = "FAILED")]
     Failed,
-    #[serde(alias = "SUCCESS")]
+    #[serde(rename = "SUCCESS")]
     Success,
-    #[serde(alias = "MAX_ATTEMPTS")]
+    #[serde(rename = "MAX_ATTEMPTS")]
     MaxAttempts,
 }
 
