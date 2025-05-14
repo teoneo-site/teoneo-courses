@@ -44,8 +44,8 @@ pub async fn get_tasks_for_module(
             return Err((StatusCode::FORBIDDEN, axum::Json(ErrorResponse::new(ErrorTypes::CourseNotOwned, "User does not own this course"))).into_response())
         }
     }
-
-    match controllers::task::get_tasks_for_module(&state.pool, module_id, if query_data.unwrap_or(StatusQueryOptional { with_status: false }).with_status {user_id.into()} else {None}).await {
+    let should_display_status = query_data.map(|val| val.with_status).unwrap_or(false);
+    match controllers::task::get_tasks_for_module(&state.pool, module_id, if should_display_status { user_id.into() } else { None }).await {
         Ok(tasks) => {
             let body = json!({
                 "data": tasks,
@@ -86,7 +86,8 @@ pub async fn get_task(
             return Err((StatusCode::FORBIDDEN, axum::Json(ErrorResponse::new(ErrorTypes::CourseNotOwned, "User does not own this course"))).into_response())
         }
     }
-    match controllers::task::get_task(&state.pool, module_id, task_id, if query_data.unwrap_or(ProgressQueryOptional { with_progress: false }).with_progress {user_id.into()} else {None}).await {
+    let should_display_progress = query_data.map(|val| val.with_progress).unwrap_or(false);
+    match controllers::task::get_task(&state.pool, module_id, task_id, if should_display_progress { user_id.into() } else { None }).await {
         Ok(task) => {
             let body = json!({
                 "data": task,
