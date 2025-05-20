@@ -99,3 +99,43 @@ pub async fn get_task_progress(
     let progress = db::progressdb::fetch_task_progress(pool, user_id, task_id).await?;
     Ok(progress)
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_progress_status_str() {
+        let status = ProgressStatus::Eval;
+        assert_eq!(status.to_string(), "EVAL");
+
+        let status = ProgressStatus::Success;
+        assert_eq!(status.to_string(), "SUCCESS");
+
+        let status = ProgressStatus::Failed;
+        assert_eq!(status.to_string(), "FAILED");
+
+        let status = ProgressStatus::MaxAttempts;
+        assert_eq!(status.to_string(), "MAX_ATTEMPTS");
+    }
+
+    #[test]
+    fn test_str_into_progress_status() {
+        let str = String::from("EVAL");
+        let status: ProgressStatus = str.into();
+        assert_eq!(status, ProgressStatus::Eval);
+
+        let str = String::from("SUCCESS");
+        let status: ProgressStatus = str.into();
+        assert_eq!(status, ProgressStatus::Success);
+    
+        let str = String::from("FAILED");
+        let status: ProgressStatus = str.into();
+        assert_eq!(status, ProgressStatus::Failed);
+
+        let str = String::from("MAX_ATTEMPTS");
+        let status: ProgressStatus = str.into();
+        assert_eq!(status, ProgressStatus::MaxAttempts);
+    }
+}

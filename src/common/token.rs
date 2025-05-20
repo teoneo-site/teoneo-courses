@@ -3,8 +3,7 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
-use chrono::{Duration, Utc};
-use jsonwebtoken::{decode, DecodingKey, EncodingKey, Header, Validation};
+use jsonwebtoken::{decode, DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
 
 use crate::handlers::{ErrorResponse, ErrorTypes};
@@ -60,13 +59,13 @@ impl<S: std::marker::Sync> FromRequestParts<S> for Claims {
     }
 }
 
-pub fn verify_jwt_token(token: &str) -> anyhow::Result<u32> {
-    let validation = Validation::default();
+// pub fn verify_jwt_token(token: &str) -> anyhow::Result<u32> {
+//     let validation = Validation::default();
 
-    let claims = decode::<Claims>(
-        token,
-        &DecodingKey::from_secret(std::env::var("SECRET_WORD_JWT").unwrap().as_ref()),
-        &validation,
-    )?;
-    Ok(claims.claims.id)
-}
+//     let claims = decode::<Claims>(
+//         token,
+//         &DecodingKey::from_secret(std::env::var("SECRET_WORD_JWT").unwrap().as_ref()),
+//         &validation,
+//     )?;
+//     Ok(claims.claims.id)
+// }

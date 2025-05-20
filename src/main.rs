@@ -12,7 +12,7 @@ use gigalib::{
 };
 use handlers::ErrorTypes;
 use sqlx::{mysql::MySqlPoolOptions, MySql, Pool};
-use tower::{buffer::BufferLayer, limit::RateLimitLayer, Layer, ServiceBuilder};
+use tower::{buffer::BufferLayer, limit::RateLimitLayer, ServiceBuilder};
 use tower_http::{catch_panic::CatchPanicLayer, cors::CorsLayer};
 
 mod common;

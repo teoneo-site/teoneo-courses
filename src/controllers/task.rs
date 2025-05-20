@@ -33,25 +33,25 @@ pub const PROMPT_TEMPLATE: &'static str = r#"
 }}
 "#;
 
-#[derive(Serialize, Deserialize, PartialEq)]
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub enum TaskType {
-    #[serde(alias = "quiz")]
+    #[serde(rename = "QUIZ")]
     Quiz,
-    #[serde(alias = "lecture")]
+    #[serde(rename = "LECTURE")]
     Lecture,
-    #[serde(alias = "prompt")]
+    #[serde(rename = "PROMPT")]
     Prompt,
-    #[serde(alias = "match")]
+    #[serde(rename = "MATCH")]
     Match,
 }
 
 impl Display for TaskType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Quiz => write!(f, "quiz"),
-            Self::Lecture => write!(f, "lecture"),
-            Self::Prompt => write!(f, "prompt"),
-            Self::Match => write!(f, "match"),
+            Self::Quiz => write!(f, "QUIZ"),
+            Self::Lecture => write!(f, "LECTURE"),
+            Self::Prompt => write!(f, "PROMPT"),
+            Self::Match => write!(f, "MATCH"),
         }
     }
 }
@@ -73,7 +73,7 @@ pub struct TaskShortInfo {
     id: i32,
     module_id: i32,
     title: String,
-    #[serde(alias = "type")]
+    #[serde(rename = "type")]
     task_type: TaskType,
     #[serde(skip_serializing_if = "Option::is_none")]
     status: Option<ProgressStatus>,
@@ -102,6 +102,7 @@ pub struct Task {
     pub id: i32,
     pub module_id: i32,
     pub title: String,
+    #[serde(rename = "type")]
     pub task_type: TaskType,
     pub content: serde_json::Value, // содержимое задания
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -177,4 +178,43 @@ pub async fn get_task(
 ) -> anyhow::Result<Task> {
     let task: Task = db::taskdb::fetch_task(pool, module_id, task_id, user_id).await?;
     Ok(task)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_tasktype_into_str() {
+        let task_type = TaskType::Lecture;
+        assert_eq!(task_type.to_string(), "LECTURE");
+
+        let task_type = TaskType::Match;
+        assert_eq!(task_type.to_string(), "MATCH");
+
+        let task_type = TaskType::Prompt;
+        assert_eq!(task_type.to_string(), "PROMPT");
+
+        let task_type = TaskType::Quiz;
+        assert_eq!(task_type.to_string(), "QUIZ");
+    }
+
+    #[test]
+    fn test_str_into_tasktype() {
+        let str = String::from("LECTURE");
+        let task_type: TaskType = str.into();
+        assert_eq!(task_type, TaskType::Lecture);
+        
+        let str = String::from("match");
+        let task_type: TaskType = str.into();
+        assert_eq!(task_type, TaskType::Match);
+
+        let str = String::from("PROMPT");
+        let task_type: TaskType = str.into();
+        assert_eq!(task_type, TaskType::Prompt);
+
+        let str = String::from("quiz");
+        let task_type: TaskType = str.into();
+        assert_eq!(task_type, TaskType::Quiz);
+    }
 }

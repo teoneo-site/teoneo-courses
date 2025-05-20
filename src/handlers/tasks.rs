@@ -1,18 +1,17 @@
 use std::i32;
 
 use axum::{
-    extract::{FromRequestParts, Path, State},
-    http::{HeaderMap, StatusCode},
+    extract::{Path, State},
+    http::StatusCode,
     response::{IntoResponse, Response},
     Json,
 };
 use axum_extra::extract::OptionalQuery;
-use jsonwebtoken::{decode, DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::{
-    common::{self, token::Claims},
+    common::token::Claims,
     controllers::{
         self,
         progress::ProgressStatus,

@@ -1,13 +1,13 @@
 use axum::{
     extract::{Path, State},
-    http::{HeaderMap, StatusCode},
+    http::StatusCode,
     response::{IntoResponse, Response},
 };
 use serde_json::json;
 
 use crate::{
-    common::{self, token::Claims},
-    controllers, db,
+    common::token::Claims,
+    controllers,
     handlers::{self, ErrorTypes},
     AppState,
 };
