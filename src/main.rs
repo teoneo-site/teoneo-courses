@@ -1,7 +1,10 @@
 use std::{any::Any, time::Duration};
 
 use axum::{
-    error_handling::HandleErrorLayer, http::StatusCode, response::{IntoResponse, Response}, BoxError, Router
+    error_handling::HandleErrorLayer,
+    http::StatusCode,
+    response::{IntoResponse, Response},
+    BoxError, Router,
 };
 use gigalib::{
     controllers::client::{ClientBuilder, GigaClient},
