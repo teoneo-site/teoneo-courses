@@ -1,9 +1,7 @@
 use std::{any::Any, time::Duration};
 
 use axum::{
-    http::StatusCode,
-    response::{IntoResponse, Response},
-    Router,
+    error_handling::HandleErrorLayer, http::StatusCode, response::{IntoResponse, Response}, BoxError, Router
 };
 use gigalib::{
     controllers::client::{ClientBuilder, GigaClient},
@@ -11,6 +9,7 @@ use gigalib::{
 };
 use handlers::ErrorTypes;
 use sqlx::{mysql::MySqlPoolOptions, MySql, Pool};
+use tower::{buffer::BufferLayer, limit::RateLimitLayer, Layer, ServiceBuilder};
 use tower_http::{catch_panic::CatchPanicLayer, cors::CorsLayer};
 
 mod common;
@@ -79,6 +78,21 @@ async fn main() {
         .route("/courses/{course_id}/modules/{module_id}/tasks/{task_id}/progress", axum::routing::get(handlers::tasks::task_progress))
         .layer(CorsLayer::permissive().allow_origin(tower_http::cors::Any))
         .layer(CatchPanicLayer::custom(internal_server_error_handler))
+        .layer(
+            ServiceBuilder::new()
+            .layer(HandleErrorLayer::new(|err: BoxError| async move { // So compiler wont complain about some Infallable Trait shit
+                eprintln!("{}", err);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    axum::Json(handlers::ErrorResponse::new(
+                        ErrorTypes::InternalError,
+                        "Internal error occured",
+                    ))
+                )
+            }))
+            .layer(BufferLayer::new(1024)) // Means it can process 1024 messages before backpressure is applied TODO: Adjust
+            .layer(RateLimitLayer::new(10, Duration::from_secs(1))), // Rate limti does not impl Clone, so we need to use BufferLayer TODO: Adjust
+            ) // Makes layers run in the background and messages are sent through the channels to them
         .with_state(app_state);
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await.unwrap();

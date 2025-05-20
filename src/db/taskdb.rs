@@ -19,9 +19,9 @@ pub async fn fetch_tasks_for_module(
         .await?
     } else {
         sqlx::query("SELECT id, title, type FROM tasks WHERE module_id = ?") // Todo: Pagination with LIMIT
-        .bind(module_id)
-        .fetch_all(pool)
-        .await?
+            .bind(module_id)
+            .fetch_all(pool)
+            .await?
     };
     let mut result = Vec::new(); // Vec of Courses
 
@@ -78,9 +78,15 @@ pub async fn fetch_task_answers(
     Ok(answers)
 }
 
-pub async fn fetch_task(pool: &MySqlPool, module_id: i32, task_id: i32, user_id: Option<i32>) -> anyhow::Result<Task> {
-    let row = if let Some(user_id) = user_id { 
-        sqlx::query("SELECT 
+pub async fn fetch_task(
+    pool: &MySqlPool,
+    module_id: i32,
+    task_id: i32,
+    user_id: Option<i32>,
+) -> anyhow::Result<Task> {
+    let row = if let Some(user_id) = user_id {
+        sqlx::query(
+            "SELECT 
             t.title, t.type,
             q.question as qquestion, q.possible_answers, q.is_multiple,
             l.text, l.picture_url, l.video_url,
@@ -93,13 +99,15 @@ pub async fn fetch_task(pool: &MySqlPool, module_id: i32, task_id: i32, user_id:
                 LEFT JOIN matches m ON t.id = m.task_id AND t.type = 'Match'
                 LEFT JOIN prompts p on t.id = p.task_id AND t.type = 'prompt'
                 LEFT JOIN task_progress pr ON pr.task_id = t.id AND pr.user_id = ?
-            WHERE t.id = ?")
+            WHERE t.id = ?",
+        )
         .bind(user_id)
         .bind(task_id)
         .fetch_one(pool)
         .await?
     } else {
-        sqlx::query("SELECT t.title, t.type,
+        sqlx::query(
+            "SELECT t.title, t.type,
                     q.question as qquestion, q.possible_answers, q.is_multiple,
                     l.text, l.picture_url, l.video_url,
                     m.question, m.left_items, m.right_items, m.picture_url,
@@ -109,7 +117,8 @@ pub async fn fetch_task(pool: &MySqlPool, module_id: i32, task_id: i32, user_id:
                 LEFT JOIN lectures l ON t.id = l.task_id AND t.type = 'Lecture'
                 LEFT JOIN matches m ON t.id = m.task_id AND t.type = 'Match'
                 LEFT JOIN prompts p on t.id = p.task_id AND t.type = 'prompt'
-            WHERE t.id = ?")
+            WHERE t.id = ?",
+        )
         .bind(task_id)
         .fetch_one(pool)
         .await?
@@ -125,7 +134,8 @@ pub async fn fetch_task(pool: &MySqlPool, module_id: i32, task_id: i32, user_id:
         .ok()
         .flatten();
     let score: Option<f32> = row
-        .try_get::<Option<f32>, _>("score").map_err(|_| ())
+        .try_get::<Option<f32>, _>("score")
+        .map_err(|_| ())
         .ok()
         .flatten();
 
@@ -179,7 +189,9 @@ pub async fn fetch_task(pool: &MySqlPool, module_id: i32, task_id: i32, user_id:
         }
     };
 
-    Ok(Task::new(task_id, module_id, title, task_type, content, status, score))
+    Ok(Task::new(
+        task_id, module_id, title, task_type, content, status, score,
+    ))
 }
 
 pub async fn fetch_prompt_details(

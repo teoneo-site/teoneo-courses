@@ -45,10 +45,15 @@ pub async fn fetch_course(pool: &MySqlPool, id: i32) -> anyhow::Result<CourseInf
     Ok(CourseInfo::new(id, title, description, tags, picture_url))
 }
 
-pub async fn validate_course_ownership(pool: &MySqlPool, user_id: i32, course_id: i32) -> anyhow::Result<bool> {
+pub async fn validate_course_ownership(
+    pool: &MySqlPool,
+    user_id: i32,
+    course_id: i32,
+) -> anyhow::Result<bool> {
     let row = sqlx::query("SELECT * FROM payments_history WHERE user_id = ? AND course_id = ?")
         .bind(user_id)
         .bind(course_id)
-        .fetch_one(pool).await?;
+        .fetch_one(pool)
+        .await?;
     Ok(!row.is_empty())
 }

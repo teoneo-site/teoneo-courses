@@ -76,17 +76,23 @@ pub struct TaskShortInfo {
     #[serde(alias = "type")]
     task_type: TaskType,
     #[serde(skip_serializing_if = "Option::is_none")]
-    status: Option<ProgressStatus>
+    status: Option<ProgressStatus>,
 }
 
 impl TaskShortInfo {
-    pub fn new(id: i32, module_id: i32, title: String, task_type: TaskType, status: Option<ProgressStatus>) -> Self {
+    pub fn new(
+        id: i32,
+        module_id: i32,
+        title: String,
+        task_type: TaskType,
+        status: Option<ProgressStatus>,
+    ) -> Self {
         Self {
             id,
             module_id,
             title,
             task_type,
-            status
+            status,
         }
     }
 }
@@ -112,7 +118,7 @@ impl Task {
         task_type: TaskType,
         content: serde_json::Value,
         status: Option<ProgressStatus>,
-        score: Option<f32>
+        score: Option<f32>,
     ) -> Self {
         Self {
             id,
@@ -121,7 +127,7 @@ impl Task {
             task_type,
             content,
             status,
-            score
+            score,
         }
     }
 }
@@ -157,13 +163,18 @@ pub struct PromptReply {
 pub async fn get_tasks_for_module(
     pool: &MySqlPool,
     module_id: i32,
-    user_id: Option<i32>
+    user_id: Option<i32>,
 ) -> anyhow::Result<Vec<TaskShortInfo>> {
     let tasks = db::taskdb::fetch_tasks_for_module(pool, module_id, user_id).await?;
     Ok(tasks)
 }
 
-pub async fn get_task(pool: &MySqlPool, module_id: i32, task_id: i32, user_id: Option<i32>) -> anyhow::Result<Task> {
+pub async fn get_task(
+    pool: &MySqlPool,
+    module_id: i32,
+    task_id: i32,
+    user_id: Option<i32>,
+) -> anyhow::Result<Task> {
     let task: Task = db::taskdb::fetch_task(pool, module_id, task_id, user_id).await?;
     Ok(task)
 }
