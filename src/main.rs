@@ -45,28 +45,34 @@ fn internal_server_error_handler(err: Box<dyn Any + Send + 'static>) -> Response
         .into_response()
 }
 
-#[tokio::main]
-async fn main() {
-    tracing_subscriber::fmt::init();
-    dotenv::dotenv().ok();
 
+async fn get_db_connection() -> anyhow::Result<Pool<MySql>> {
     let connect_str = "mysql://root:root@localhost:3306/teoneo";
     let mysql_pool = MySqlPoolOptions::new()
         .max_connections(5)
         .acquire_timeout(Duration::from_secs(10))
         .connect(connect_str)
-        .await
-        .expect("Could not connect to the database");
+        .await?;
+    Ok(mysql_pool)
+}
 
+async fn get_gigachat_client() -> anyhow::Result<GigaClient> {
     let config: MessageConfig = MessageConfigBuilder::new().set_model("GigaChat").build();
     let client: GigaClient = ClientBuilder::new()
         .set_basic_token(&std::env::var("GIGACHAT_TOKEN").unwrap())
         .set_msg_cfg(config)
         .build();
+    Ok(client)
+}
+
+#[tokio::main]
+async fn main() {
+    tracing_subscriber::fmt::init();
+    dotenv::dotenv().ok();
 
     let app_state = AppState {
-        pool: mysql_pool,
-        ai: client,
+        pool: get_db_connection().await.unwrap(),
+        ai: get_gigachat_client().await.unwrap(),
     };
 
     #[rustfmt::skip]
