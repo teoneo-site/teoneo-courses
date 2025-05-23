@@ -65,17 +65,8 @@ async fn get_gigachat_client() -> anyhow::Result<GigaClient> {
     Ok(client)
 }
 
-#[tokio::main]
-async fn main() {
-    tracing_subscriber::fmt::init();
-    dotenv::dotenv().ok();
 
-    let app_state = AppState {
-        pool: get_db_connection().await.unwrap(),
-        ai: get_gigachat_client().await.unwrap(),
-    };
-
-    #[rustfmt::skip]
+fn get_router(app_state: AppState) -> Router {
     let app = Router::new()
         .route("/courses", axum::routing::get(handlers::courses::get_all_courses))
         .route("/courses/{course_id}", axum::routing::get(handlers::courses::get_course))
@@ -103,7 +94,20 @@ async fn main() {
             .layer(RateLimitLayer::new(10, Duration::from_secs(1))), // Rate limti does not impl Clone, so we need to use BufferLayer TODO: Adjust
             ) // Makes layers run in the background and messages are sent through the channels to them
         .with_state(app_state);
+    app
+}
 
+#[tokio::main]
+async fn main() {
+    tracing_subscriber::fmt::init();
+    dotenv::dotenv().ok();
+
+    let app_state = AppState {
+        pool: get_db_connection().await.unwrap(),
+        ai: get_gigachat_client().await.unwrap()
+    };
+    let router = get_router(app_state);
+    
     let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await.unwrap();
-    axum::serve(listener, app).await.unwrap();
+    axum::serve(listener, router).await.unwrap();
 }
