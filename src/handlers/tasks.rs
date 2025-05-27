@@ -36,20 +36,16 @@ pub async fn get_tasks_for_module(
     Path((course_id, module_id)): Path<(i32, i32)>,
 ) -> Result<Response, Response> {
     let user_id = claims.id as i32;
-    match controllers::course::verify_ownership(&state, claims.id as i32, course_id).await {
-        Ok(_) => {} // if does own nothing happens, just go on
-        Err(_) => {
-            // Does not own the course
-            // eprintln!("Could not verify course ownership {}", why);
-            return Err((
-                StatusCode::FORBIDDEN,
-                axum::Json(ErrorResponse::new(
-                    ErrorTypes::CourseNotOwned,
-                    "User does not own this course",
-                )),
-            )
-                .into_response());
-        }
+    if let Err(why) = controllers::course::verify_ownership(&state, claims.id as i32, course_id).await {
+        eprintln!("Could not verify course ownership {}", why);
+        return Err((
+            StatusCode::FORBIDDEN,
+            axum::Json(ErrorResponse::new(
+                ErrorTypes::CourseNotOwned,
+                "User does not own this course",
+            )),
+        )
+            .into_response());
     }
     let should_display_status = query_data.map(|val| val.with_status).unwrap_or(false);
     match controllers::task::get_tasks_for_module(
@@ -96,20 +92,17 @@ pub async fn get_task(
     Path((course_id, module_id, task_id)): Path<(i32, i32, i32)>,
 ) -> Result<Response, Response> {
     let user_id = claims.id as i32;
-    match controllers::course::verify_ownership(&state, claims.id as i32, course_id).await {
-        Ok(_) => {} // if does own nothing happens, just go on
-        Err(_) => {
-            // Does not own the course
-            // eprintln!("Could not verify course ownership {}", why);
-            return Err((
-                StatusCode::FORBIDDEN,
-                axum::Json(ErrorResponse::new(
-                    ErrorTypes::CourseNotOwned,
-                    "User does not own this course",
-                )),
-            )
-                .into_response());
-        }
+    if let Err(why) =  controllers::course::verify_ownership(&state, claims.id as i32, course_id).await {
+        // Does not own the course
+        eprintln!("Could not verify course ownership {}", why);
+        return Err((
+            StatusCode::FORBIDDEN,
+            axum::Json(ErrorResponse::new(
+                ErrorTypes::CourseNotOwned,
+                "User does not own this course",
+            )),
+        )
+            .into_response());
     }
     let should_display_progress = query_data.map(|val| val.with_progress).unwrap_or(false);
     match controllers::task::get_task(
@@ -157,20 +150,17 @@ pub async fn submit_task(
     Json(user_answers): Json<serde_json::Value>,
 ) -> Result<Response, Response> {
     let user_id = claims.id;
-    match controllers::course::verify_ownership(&state, user_id as i32, course_id).await {
-        Ok(_) => {} // if does own nothing happens, just go on
-        Err(_) => {
-            // Does not own the course
-            // eprintln!("Could not verify course ownership {}", why);
-            return Err((
-                StatusCode::FORBIDDEN,
-                axum::Json(ErrorResponse::new(
-                    ErrorTypes::CourseNotOwned,
-                    "User does not own this course",
-                )),
-            )
-                .into_response());
-        }
+    if let Err(why) = controllers::course::verify_ownership(&state, user_id as i32, course_id).await {
+        // Does not own the course
+        eprintln!("Could not verify course ownership {}", why);
+        return Err((
+            StatusCode::FORBIDDEN,
+            axum::Json(ErrorResponse::new(
+                ErrorTypes::CourseNotOwned,
+                "User does not own this course",
+            )),
+        )
+            .into_response());
     }
 
     let task_type = match db::taskdb::fetch_task_type(&state.pool, task_id).await {
@@ -267,20 +257,17 @@ pub async fn task_progress(
     Path((course_id, _module_id, task_id)): Path<(i32, i32, i32)>,
 ) -> Result<Response, Response> {
     let user_id = claims.id;
-    match controllers::course::verify_ownership(&state, claims.id as i32, course_id).await {
-        Ok(_)  => {} // if does own nothing happens, just go on
-        Err(_) => {
-            // Does not own the course
-            // eprintln!("Could not verify course ownership {}", why);
-            return Err((
-                StatusCode::FORBIDDEN,
-                axum::Json(ErrorResponse::new(
-                    ErrorTypes::CourseNotOwned,
-                    "User does not own this course",
-                )),
-            )
-                .into_response());
-        }
+    if let Err(why) = controllers::course::verify_ownership(&state, claims.id as i32, course_id).await {
+        // Does not own the course
+        eprintln!("Could not verify course ownership {}", why);
+        return Err((
+            StatusCode::FORBIDDEN,
+            axum::Json(ErrorResponse::new(
+                ErrorTypes::CourseNotOwned,
+                "User does not own this course",
+            )),
+        )
+            .into_response());
     }
     match controllers::progress::get_task_progress(&state, user_id, task_id).await {
         Ok(progress) => {

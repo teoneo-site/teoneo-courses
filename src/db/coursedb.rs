@@ -9,6 +9,7 @@ pub async fn fetch_courses(state: &AppState) -> anyhow::Result<Vec<CourseInfo>> 
     let mut conn = state.redis.get()?;
     if let Ok(val) = conn.get::<&str, String>("courses:all") { // If courses are cached
         if let Ok(parsed_vec) = serde_json::from_str::<Vec<CourseInfo>>(&val) { // Get them from redis
+            println!("Cachedcourses");
             return Ok(parsed_vec)
         }
     }
