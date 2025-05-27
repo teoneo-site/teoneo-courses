@@ -15,7 +15,7 @@ use crate::{
     controllers::{
         self,
         progress::ProgressStatus,
-        task::{process_prompt_task, QuizUserAnswer, TaskType},
+        task::{process_prompt_task, TaskType},
     },
     db,
     handlers::{self, ErrorTypes},
@@ -36,9 +36,9 @@ pub async fn get_tasks_for_module(
     Path((course_id, module_id)): Path<(i32, i32)>,
 ) -> Result<Response, Response> {
     let user_id = claims.id as i32;
-    match controllers::course::verify_ownership(&state.pool, claims.id as i32, course_id).await {
-        Ok(val) if val == true => {} // if does own nothing happens, just go on
-        Err(_) | Ok(_) => {
+    match controllers::course::verify_ownership(&state, claims.id as i32, course_id).await {
+        Ok(_) => {} // if does own nothing happens, just go on
+        Err(_) => {
             // Does not own the course
             // eprintln!("Could not verify course ownership {}", why);
             return Err((
@@ -53,7 +53,7 @@ pub async fn get_tasks_for_module(
     }
     let should_display_status = query_data.map(|val| val.with_status).unwrap_or(false);
     match controllers::task::get_tasks_for_module(
-        &state.pool,
+        &state,
         module_id,
         if should_display_status {
             user_id.into()
@@ -96,9 +96,9 @@ pub async fn get_task(
     Path((course_id, module_id, task_id)): Path<(i32, i32, i32)>,
 ) -> Result<Response, Response> {
     let user_id = claims.id as i32;
-    match controllers::course::verify_ownership(&state.pool, claims.id as i32, course_id).await {
-        Ok(val) if val == true => {} // if does own nothing happens, just go on
-        Err(_) | Ok(_) => {
+    match controllers::course::verify_ownership(&state, claims.id as i32, course_id).await {
+        Ok(_) => {} // if does own nothing happens, just go on
+        Err(_) => {
             // Does not own the course
             // eprintln!("Could not verify course ownership {}", why);
             return Err((
@@ -113,7 +113,7 @@ pub async fn get_task(
     }
     let should_display_progress = query_data.map(|val| val.with_progress).unwrap_or(false);
     match controllers::task::get_task(
-        &state.pool,
+        &state,
         module_id,
         task_id,
         if should_display_progress {
@@ -157,9 +157,9 @@ pub async fn submit_task(
     Json(user_answers): Json<serde_json::Value>,
 ) -> Result<Response, Response> {
     let user_id = claims.id;
-    match controllers::course::verify_ownership(&state.pool, user_id as i32, course_id).await {
-        Ok(val) if val == true => {} // if does own nothing happens, just go on
-        Err(_) | Ok(_) => {
+    match controllers::course::verify_ownership(&state, user_id as i32, course_id).await {
+        Ok(_) => {} // if does own nothing happens, just go on
+        Err(_) => {
             // Does not own the course
             // eprintln!("Could not verify course ownership {}", why);
             return Err((
@@ -191,7 +191,7 @@ pub async fn submit_task(
     // Insert EVAL progress status
     // Frontend can query status at this point
     controllers::progress::update_or_insert_status(
-        &state.pool,
+        &state,
         claims.id,
         task_id,
         ProgressStatus::Eval,
@@ -205,7 +205,7 @@ pub async fn submit_task(
     match task_type {
         TaskType::Quiz | TaskType::Match => {
             if let Err(why) = controllers::task::submit_quiz_task(
-                &state.pool,
+                &state,
                 claims.id,
                 task_id,
                 task_type,
@@ -267,9 +267,9 @@ pub async fn task_progress(
     Path((course_id, _module_id, task_id)): Path<(i32, i32, i32)>,
 ) -> Result<Response, Response> {
     let user_id = claims.id;
-    match controllers::course::verify_ownership(&state.pool, claims.id as i32, course_id).await {
-        Ok(val) if val == true => {} // if does own nothing happens, just go on
-        Err(_) | Ok(_) => {
+    match controllers::course::verify_ownership(&state, claims.id as i32, course_id).await {
+        Ok(_)  => {} // if does own nothing happens, just go on
+        Err(_) => {
             // Does not own the course
             // eprintln!("Could not verify course ownership {}", why);
             return Err((
@@ -282,7 +282,7 @@ pub async fn task_progress(
                 .into_response());
         }
     }
-    match controllers::progress::get_task_progress(&state.pool, user_id, task_id).await {
+    match controllers::progress::get_task_progress(&state, user_id, task_id).await {
         Ok(progress) => {
             let body = json!({
                 "data": progress

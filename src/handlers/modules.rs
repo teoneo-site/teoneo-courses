@@ -17,7 +17,7 @@ pub async fn get_modules_for_course(
     State(state): State<AppState>,
     Path(course_id): Path<i32>,
 ) -> Result<Response, Response> {
-    match controllers::module::get_modules_for_course(&state.pool, course_id).await {
+    match controllers::module::get_modules_for_course(&state, course_id).await {
         Ok(modules) => {
             let mut json: serde_json::value::Value = serde_json::Value::Null;
             json["data"] = serde_json::Value::Array([].to_vec());
@@ -54,16 +54,16 @@ pub async fn get_module(
     Path((course_id, module_id)): Path<(i32, i32)>,
 ) -> Result<Response, Response> {
     let is_subscribed_to_course =
-        match controllers::course::verify_ownership(&state.pool, claims.id as i32, course_id).await
+        match controllers::course::verify_ownership(&state, claims.id as i32, course_id).await
         {
-            Ok(val) => val,
+            Ok(_) => true,
             Err(why) => {
                 eprintln!("Why ver ownership failed: {}", why);
                 false // user will see public part of the module
             }
         };
 
-    match controllers::module::get_module(&state.pool, course_id, module_id).await {
+    match controllers::module::get_module(&state, course_id, module_id).await {
         Ok(module) => {
             let body = if is_subscribed_to_course {
                 json!({

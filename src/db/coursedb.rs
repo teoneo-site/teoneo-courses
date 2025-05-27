@@ -1,36 +1,54 @@
+use redis::Commands;
 use sqlx::MySqlPool;
 use sqlx::Row;
 
 use crate::controllers::course::CourseInfo;
+use crate::AppState;
 
-pub async fn fetch_courses(pool: &MySqlPool) -> anyhow::Result<Vec<CourseInfo>> {
+pub async fn fetch_courses(state: &AppState) -> anyhow::Result<Vec<CourseInfo>> {
+
+    let mut conn = state.redis.get()?;
+    if let Ok(val) = conn.get::<&str, String>("courses:all") { // If courses are cached
+        if let Ok(parsed_vec) = serde_json::from_str::<Vec<CourseInfo>>(&val) { // Get them from redis
+            return Ok(parsed_vec)
+        }
+    }
+
     let rows = sqlx::query("SELECT id, title, description, tags, picture_url FROM courses") // Todo: Pagination with LIMIT
-        .fetch_all(pool)
+        .fetch_all(&state.pool)
         .await?;
-
     let mut result = Vec::new(); // Vec of Courses
-
     for row in rows {
-        let id: i32 = row.try_get(0)?;
-        let title: String = row.try_get(1)?;
-        let description: String = row.try_get(2)?;
+        let id: i32 = row.try_get("id")?;
+        let title: String = row.try_get("title")?;
+        let description: String = row.try_get("description")?;
         let tags = row
-            .try_get::<String, _>(3)?
+            .try_get::<String, _>("tags")?
             .split(",")
             .map(|str| str.to_owned())
             .collect::<Vec<String>>(); // tags are stored like "python,ai,cock" we transform it into ["py...", "ai", "cock"]
-
-        let picture_url: String = row.try_get(4)?;
+        let picture_url: String = row.try_get("picture_url")?;
         result.push(CourseInfo::new(id, title, description, tags, picture_url));
-    }
+    }   
 
+    // If courses aren't cached -> cache them for an hour
+    let result_str = serde_json::to_string(&result).unwrap();  // Isn't supposed to fail
+    let _: () = conn.set_ex("courses:all", result_str, 3600).unwrap_or(()); // Ignore error, because we dont really care, can't afford to break when cant set smth
     Ok(result)
 }
 
-pub async fn fetch_course(pool: &MySqlPool, id: i32) -> anyhow::Result<CourseInfo> {
+pub async fn fetch_course(state: &AppState, id: i32) -> anyhow::Result<CourseInfo> {
+    let mut conn = state.redis.get().unwrap();
+
+    if let Ok(val) = conn.get::<String, String>(format!("course:{}", id)) {
+        if let Ok(parsed_course) = serde_json::from_str::<CourseInfo>(&val) {
+            return Ok(parsed_course)
+        }
+    }
+
     let row = sqlx::query("SELECT title, description, tags, picture_url FROM courses WHERE id = ?")
         .bind(id)
-        .fetch_one(pool)
+        .fetch_one(&state.pool)
         .await?;
 
     let title: String = row.try_get("title")?;
@@ -41,19 +59,30 @@ pub async fn fetch_course(pool: &MySqlPool, id: i32) -> anyhow::Result<CourseInf
         .map(|str| str.to_owned())
         .collect::<Vec<String>>(); // tags are stored like "python,ai,cock" we transform it into ["py...", "ai", "cock"]
     let picture_url: String = row.try_get("picture_url")?;
+    let course = CourseInfo::new(id, title, description, tags, picture_url);
 
-    Ok(CourseInfo::new(id, title, description, tags, picture_url))
+    let course_str = serde_json::to_string(&course).unwrap(); // Isn't supposed to fail
+    let _ : () = conn.set_ex(format!("course:{}", id), course_str, 3600).unwrap_or(());
+
+    Ok(course)
 }
 
 pub async fn validate_course_ownership(
-    pool: &MySqlPool,
+    state: &AppState,
     user_id: i32,
     course_id: i32,
-) -> anyhow::Result<bool> {
-    let row = sqlx::query("SELECT * FROM payments_history WHERE user_id = ? AND course_id = ?")
+) -> anyhow::Result<()> {
+    let mut conn = state.redis.get().unwrap();
+
+    let cache_key = format!("ownership:{}:{}", user_id, course_id);
+    if let Ok(true) = conn.exists(&cache_key) {
+        return Ok(())
+    }
+    sqlx::query("SELECT * FROM payments_history WHERE user_id = ? AND course_id = ? LIMIT 1") // Limit 1 for optimization
         .bind(user_id)
         .bind(course_id)
-        .fetch_one(pool)
+        .fetch_one(&state.pool)
         .await?;
-    Ok(!row.is_empty())
+    let _ : () = conn.set_ex(&cache_key, "has", 300).unwrap_or(()); // Set any value, which means the row will be there
+    Ok(()) // At this point there is a row 100% which proves ownership
 }

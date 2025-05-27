@@ -1,3 +1,4 @@
+use redis::Commands;
 use sqlx::MySqlPool;
 use sqlx::Row;
 
@@ -5,22 +6,31 @@ use crate::controllers::progress::ProgressStatus;
 use crate::controllers::task::Task;
 use crate::controllers::task::TaskShortInfo;
 use crate::controllers::task::TaskType;
+use crate::AppState;
 
 pub async fn fetch_tasks_for_module(
-    pool: &MySqlPool,
+    state: &AppState,
     module_id: i32,
     user_id: Option<i32>,
 ) -> anyhow::Result<Vec<TaskShortInfo>> {
+    let mut conn = state.redis.get().unwrap();
+    let cache_key = format!("module:{}:tasks:all", module_id);
+    if let Ok(val) = conn.get::<&str, String>(&cache_key) {
+        if let Ok(parsed_tasks) = serde_json::from_str::<Vec<TaskShortInfo>>(&val) {
+            return Ok(parsed_tasks)
+        }
+    }
+
     let rows = if let Some(user_id) = user_id {
         sqlx::query("SELECT t.id, t.title, t.type, tp.status AS status FROM tasks t LEFT JOIN task_progress tp ON tp.task_id = t.id AND tp.user_id = ? WHERE t.module_id = ?")
         .bind(user_id)
         .bind(module_id)
-        .fetch_all(pool)
+        .fetch_all(&state.pool)
         .await?
     } else {
         sqlx::query("SELECT id, title, type FROM tasks WHERE module_id = ?") // Todo: Pagination with LIMIT
             .bind(module_id)
-            .fetch_all(pool)
+            .fetch_all(&state.pool)
             .await?
     };
     let mut result = Vec::new(); // Vec of Courses
@@ -38,6 +48,8 @@ pub async fn fetch_tasks_for_module(
         result.push(TaskShortInfo::new(id, module_id, title, task_type, status));
     }
 
+    let result_str = serde_json::to_string(&result).unwrap(); // Should not panic
+    let _ : () = conn.set_ex(&cache_key, result_str, 3600).unwrap_or(());
     Ok(result)
 }
 
@@ -51,6 +63,7 @@ pub async fn fetch_task_type(pool: &MySqlPool, task_id: i32) -> anyhow::Result<T
     Ok(task_type)
 }
 
+// Should not cache this since task_id is probably indexed so its a pretty fast search
 pub async fn fetch_task_answers(
     pool: &MySqlPool,
     task_type: TaskType,
@@ -79,11 +92,19 @@ pub async fn fetch_task_answers(
 }
 
 pub async fn fetch_task(
-    pool: &MySqlPool,
+    state: &AppState,
     module_id: i32,
     task_id: i32,
     user_id: Option<i32>,
 ) -> anyhow::Result<Task> {
+    let mut conn = state.redis.get().unwrap();
+    let cache_key = format!("task:{}", task_id);
+    if let Ok(val) = conn.get::<&str, String>(&cache_key) { // Cache is up to date (in terms of progress), becase we delete key, when updating progress
+        if let Ok(parsed_task) = serde_json::from_str(&val) {
+            return Ok(parsed_task)
+        } 
+    }
+
     let row = if let Some(user_id) = user_id {
         sqlx::query(
             "SELECT 
@@ -103,9 +124,10 @@ pub async fn fetch_task(
         )
         .bind(user_id)
         .bind(task_id)
-        .fetch_one(pool)
+        .fetch_one(&state.pool)
         .await?
     } else {
+        
         sqlx::query(
             "SELECT t.title, t.type,
                     q.question as qquestion, q.possible_answers, q.is_multiple,
@@ -120,7 +142,7 @@ pub async fn fetch_task(
             WHERE t.id = ?",
         )
         .bind(task_id)
-        .fetch_one(pool)
+        .fetch_one(&state.pool)
         .await?
     };
 
@@ -188,10 +210,14 @@ pub async fn fetch_task(
             })
         }
     };
-
-    Ok(Task::new(
+    let task = Task::new(
         task_id, module_id, title, task_type, content, status, score,
-    ))
+    );
+
+    let task_str = serde_json::to_string(&task).unwrap(); // Should not panic
+    let _ : () = conn.set_ex(&cache_key, task_str, 3600).unwrap_or(());
+
+    Ok(task)
 }
 
 pub async fn fetch_prompt_details(

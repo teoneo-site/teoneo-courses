@@ -24,6 +24,7 @@ mod handlers;
 struct AppState {
     pool: Pool<MySql>,
     ai: GigaClient,
+    redis: r2d2::Pool<redis::Client>
 }
 
 fn internal_server_error_handler(err: Box<dyn Any + Send + 'static>) -> Response {
@@ -45,7 +46,7 @@ fn internal_server_error_handler(err: Box<dyn Any + Send + 'static>) -> Response
         .into_response()
 }
 
-async fn get_db_connection() -> anyhow::Result<Pool<MySql>> {
+async fn get_db_pool() -> anyhow::Result<Pool<MySql>> {
     let connect_str = "mysql://root:root@localhost:3306/teoneo";
     let mysql_pool = MySqlPoolOptions::new()
         .max_connections(5)
@@ -53,6 +54,12 @@ async fn get_db_connection() -> anyhow::Result<Pool<MySql>> {
         .connect(connect_str)
         .await?;
     Ok(mysql_pool)
+}
+
+async fn get_redis_pool() -> anyhow::Result<r2d2::Pool<redis::Client>> {
+    let client = redis::Client::open("redis://127.0.0.1/")?;
+    let pool = r2d2::Pool::builder().build(client).unwrap();
+    Ok(pool)
 }
 
 async fn get_gigachat_client() -> anyhow::Result<GigaClient> {
@@ -126,8 +133,9 @@ async fn main() {
     dotenv::dotenv().ok();
 
     let app_state = AppState {
-        pool: get_db_connection().await.unwrap(),
-        ai: get_gigachat_client().await.unwrap(),
+        pool: get_db_pool().await.expect("Could not connect to the database"),
+        ai: get_gigachat_client().await.expect("Could not connect to gigachat"),
+        redis: get_redis_pool().await.expect("Could not connect to redis")
     };
     let router = get_router(app_state);
 

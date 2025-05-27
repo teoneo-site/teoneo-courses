@@ -4,7 +4,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::MySqlPool;
 
-use crate::db;
+use crate::{db, AppState};
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 pub enum ProgressStatus {
@@ -78,7 +78,7 @@ impl Progress {
 }
 
 pub async fn update_or_insert_status(
-    pool: &MySqlPool,
+    state: &AppState,
     user_id: u32,
     task_id: i32,
     status: ProgressStatus,
@@ -86,17 +86,17 @@ pub async fn update_or_insert_status(
     score: f32,
     attempts: i32,
 ) -> anyhow::Result<()> {
-    db::progressdb::update_or_insert(pool, user_id, task_id, status, submission, score, attempts)
+    db::progressdb::update_or_insert(state, user_id, task_id, status, submission, score, attempts)
         .await?;
     Ok(())
 }
 
 pub async fn get_task_progress(
-    pool: &MySqlPool,
+    state: &AppState,
     user_id: u32,
     task_id: i32,
 ) -> anyhow::Result<Progress> {
-    let progress = db::progressdb::fetch_task_progress(pool, user_id, task_id).await?;
+    let progress = db::progressdb::fetch_task_progress(state, user_id, task_id).await?;
     Ok(progress)
 }
 

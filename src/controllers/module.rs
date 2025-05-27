@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use sqlx::MySqlPool;
 
-use crate::db;
+use crate::{db, AppState};
 
 #[derive(Serialize, Deserialize)]
 pub struct ModuleInfo {
@@ -38,18 +38,18 @@ impl ModuleInfo {
 
 // Functions may be later used to implement pagination or something
 pub async fn get_modules_for_course(
-    pool: &MySqlPool,
+    state: &AppState,
     course_id: i32,
 ) -> anyhow::Result<Vec<ModuleInfo>> {
-    let modules = db::moduledb::fetch_modules_for_course(pool, course_id).await?;
+    let modules = db::moduledb::fetch_modules_for_course(state, course_id).await?;
     Ok(modules)
 }
 
 pub async fn get_module(
-    pool: &MySqlPool,
+    state: &AppState,
     course_id: i32,
     module_id: i32,
 ) -> anyhow::Result<ModuleInfo> {
-    let module = db::moduledb::fetch_module(pool, course_id, module_id).await?;
+    let module = db::moduledb::fetch_module(state, course_id, module_id).await?;
     Ok(module)
 }

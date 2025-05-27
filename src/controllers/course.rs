@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use sqlx::MySqlPool;
 
-use crate::db;
+use crate::{db, AppState};
 
 #[derive(Serialize, Deserialize)]
 pub struct CourseInfo {
@@ -33,7 +33,7 @@ impl CourseInfo {
 // Currently, there is really no need for this method in the controller,
 // you can just call fetch from the handler,
 // BUT maybe we'll need this in future for some settings kinda stuff
-pub async fn get_all_courses(pool: &MySqlPool) -> anyhow::Result<Vec<CourseInfo>> {
+pub async fn get_all_courses(pool: &AppState) -> anyhow::Result<Vec<CourseInfo>> {
     let courses = db::coursedb::fetch_courses(pool).await?;
     Ok(courses)
 }
@@ -41,15 +41,15 @@ pub async fn get_all_courses(pool: &MySqlPool) -> anyhow::Result<Vec<CourseInfo>
 // Currently, there is really no need for this method in the controller,
 // you can just call fetch from the handler,
 // BUT maybe we'll need this in future for some settings kinda stuff
-pub async fn get_course(pool: &MySqlPool, id: i32) -> anyhow::Result<CourseInfo> {
-    let course = db::coursedb::fetch_course(pool, id).await?;
+pub async fn get_course(state: &AppState, id: i32) -> anyhow::Result<CourseInfo> {
+    let course = db::coursedb::fetch_course(state, id).await?;
     Ok(course)
 }
 
 pub async fn verify_ownership(
-    pool: &MySqlPool,
+    state: &AppState,
     user_id: i32,
     course_id: i32,
-) -> anyhow::Result<bool> {
-    Ok(db::coursedb::validate_course_ownership(pool, user_id, course_id).await?)
+) -> anyhow::Result<()> {
+    Ok(db::coursedb::validate_course_ownership(state, user_id, course_id).await?)
 }
