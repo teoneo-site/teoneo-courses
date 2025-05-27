@@ -1,12 +1,12 @@
 use axum::{
     extract::{Path, State},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
 };
 use serde_json::json;
 
 use crate::{
-    common::token::Claims,
+    common::{self, token::Claims},
     controllers,
     handlers::{self, ErrorTypes},
     AppState,
@@ -50,18 +50,27 @@ pub async fn get_modules_for_course(
 
 pub async fn get_module(
     State(state): State<AppState>,
-    claims: Claims,
+    headers: HeaderMap,
     Path((course_id, module_id)): Path<(i32, i32)>,
 ) -> Result<Response, Response> {
-    let is_subscribed_to_course =
-        match controllers::course::verify_ownership(&state, claims.id as i32, course_id).await
-        {
+    let authorization_token = headers
+            .get("Authorization")
+            .and_then(|value| value.to_str().ok())
+            .and_then(|s| s.split_whitespace().last())
+            .unwrap_or("");
+
+    let is_subscribed_to_course = if let Ok(user_id) = common::token::verify_jwt_token(authorization_token) {
+        match controllers::course::verify_ownership(&state, user_id as i32, course_id).await {
             Ok(_) => true,
             Err(why) => {
-                eprintln!("Why ver ownership failed: {}", why);
-                false // user will see public part of the module
+                eprintln!("verify_ownership failed: {}", why);
+                false
             }
-        };
+        }
+    } else {
+        false
+    };
+        
 
     match controllers::module::get_module(&state, course_id, module_id).await {
         Ok(module) => {
