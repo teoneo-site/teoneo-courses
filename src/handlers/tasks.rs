@@ -15,7 +15,7 @@ use crate::{
     controllers::{
         self,
         progress::ProgressStatus,
-        task::{QuizUserAnswer, TaskType},
+        task::{process_prompt_task, QuizUserAnswer, TaskType},
     },
     db,
     handlers::{self, ErrorTypes},
@@ -156,7 +156,8 @@ pub async fn submit_task(
     Path((course_id, _module_id, task_id)): Path<(i32, i32, i32)>, // We dont really need module_id tho, just course (not necessary and)
     Json(user_answers): Json<serde_json::Value>,
 ) -> Result<Response, Response> {
-    match controllers::course::verify_ownership(&state.pool, claims.id as i32, course_id).await {
+    let user_id = claims.id;
+    match controllers::course::verify_ownership(&state.pool, user_id as i32, course_id).await {
         Ok(val) if val == true => {} // if does own nothing happens, just go on
         Err(_) | Ok(_) => {
             // Does not own the course
@@ -203,50 +204,25 @@ pub async fn submit_task(
 
     match task_type {
         TaskType::Quiz | TaskType::Match => {
-            let answers_str = db::taskdb::fetch_task_answers(&state.pool, task_type, task_id)
-                .await
-                .unwrap(); // TODO: Handle
-            let task_answers: Vec<u8> = answers_str
-                .split(";")
-                .map(|element| element.parse::<u8>().unwrap_or(0))
-                .collect();
-            let user_answers: QuizUserAnswer =
-                serde_json::from_value(user_answers["data"].clone()).unwrap(); // TODO: Handle
-
-            if task_answers.len() != user_answers.answers.len()
-                || task_answers
-                    .iter()
-                    .zip(&user_answers.answers)
-                    .filter(|&(a, b)| a == b)
-                    .count()
-                    != task_answers.len()
+            if let Err(why) = controllers::task::submit_quiz_task(
+                &state.pool,
+                claims.id,
+                task_id,
+                task_type,
+                user_answers,
+            )
+            .await
             {
-                controllers::progress::update_or_insert_status(
-                    &state.pool,
-                    claims.id,
-                    task_id,
-                    ProgressStatus::Failed,
-                    serde_json::to_string(&user_answers).unwrap(),
-                    0.0,
-                    1,
+                eprintln!("Could not submit quiz|match task: {}", why);
+                return Err((
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    axum::Json(handlers::ErrorResponse::new(
+                        ErrorTypes::InternalError,
+                        "Error when submiting a quiz/match task",
+                    )),
                 )
-                .await
-                .unwrap(); // Careful
-            } else {
-                // Set status to SUCCESSS, submission to user_answers, score to 1.0, attempts to 1 if exists + 1
-                controllers::progress::update_or_insert_status(
-                    &state.pool,
-                    claims.id,
-                    task_id,
-                    ProgressStatus::Success,
-                    serde_json::to_string(&user_answers).unwrap(),
-                    1.0,
-                    1,
-                )
-                .await
-                .unwrap(); // Careful
+                    .into_response());
             }
-
             return Ok((StatusCode::ACCEPTED).into_response());
         }
         TaskType::Prompt => {
@@ -254,7 +230,6 @@ pub async fn submit_task(
                 db::progressdb::get_prompt_task_attemps(&state.pool, claims.id, task_id) // Task is supposed to be prompt 100% at this point
                     .await
                     .unwrap(); // So unwrap() should not panic
-
             if attempts >= max_attemps {
                 // Signal using 400 that max attempts is hit
                 return Err((
@@ -267,52 +242,17 @@ pub async fn submit_task(
                     .into_response());
             }
 
-            tokio::spawn(async move {
-                // Get attemps, max attemps and additional_field
-                let pool = state.pool;
-                let mut client = state.ai;
-
-                let (question, add_prompt) = db::taskdb::fetch_prompt_details(&pool, task_id) // Again, task_id is 100% Prompt type
-                    .await
-                    .unwrap(); // This should not panic,only if Databse is broken, but then it will return 500 Server Internal Error on Panic
-                let user_prompt = user_answers["data"]["user_prompt"]
-                    .as_str()
-                    .unwrap_or_default();
-
-                let message = controllers::task::PROMPT_TEMPLATE
-                    .replace("{question}", &question)
-                    .replace("{user_prompt}", &user_prompt)
-                    .replace(
-                        "{additional_prompt}",
-                        &add_prompt.unwrap_or("Нет доп. промпта".to_owned()),
-                    );
-
-                let reply = client.send_message(message.into()).await.unwrap(); // Should not panic under normal circumstances, only if gigachat is down, then it returns 500 Server internal error
-                let reply_struct: controllers::task::PromptReply =
-                    serde_json::from_str(&reply.content).unwrap(); // Panics on rate limit by gigachat, but 500 for this kind of situation is ok I guess?
-
-                let mut json_submission: serde_json::Value =
-                    serde_json::Value::Object(serde_json::Map::new());
-                json_submission["reply"] = reply_struct.reply.into();
-                json_submission["feedback"] = reply_struct.feedback.into();
-                let score: f32 = reply_struct.score;
-
-                controllers::progress::update_or_insert_status(
-                    &pool,
-                    claims.id,
-                    task_id,
-                    if score < 0.4 {
-                        ProgressStatus::Failed
-                    } else {
-                        ProgressStatus::Success
-                    },
-                    json_submission.to_string(),
-                    score,
-                    0,
+            if let Err(why) = process_prompt_task(state, claims.id, task_id, user_answers).await {
+                eprintln!("Error submiting prompt task: {}", why);
+                return Err((
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    axum::Json(handlers::ErrorResponse::new(
+                        ErrorTypes::InternalError,
+                        "Error when submiting a prompt task",
+                    )),
                 )
-                .await
-                .unwrap(); // Should not panic, since at this point there is "eval" row that will get updated
-            });
+                    .into_response());
+            }
         }
         TaskType::Lecture => {}
     };
@@ -324,7 +264,7 @@ pub async fn submit_task(
 pub async fn task_progress(
     State(state): State<AppState>,
     claims: Claims,
-    Path((course_id, module_id, task_id)): Path<(i32, i32, i32)>,
+    Path((course_id, _module_id, task_id)): Path<(i32, i32, i32)>,
 ) -> Result<Response, Response> {
     let user_id = claims.id;
     match controllers::course::verify_ownership(&state.pool, claims.id as i32, course_id).await {

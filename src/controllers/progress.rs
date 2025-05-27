@@ -100,7 +100,6 @@ pub async fn get_task_progress(
     Ok(progress)
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -129,7 +128,7 @@ mod tests {
         let str = String::from("SUCCESS");
         let status: ProgressStatus = str.into();
         assert_eq!(status, ProgressStatus::Success);
-    
+
         let str = String::from("FAILED");
         let status: ProgressStatus = str.into();
         assert_eq!(status, ProgressStatus::Failed);

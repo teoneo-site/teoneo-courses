@@ -45,7 +45,6 @@ fn internal_server_error_handler(err: Box<dyn Any + Send + 'static>) -> Response
         .into_response()
 }
 
-
 async fn get_db_connection() -> anyhow::Result<Pool<MySql>> {
     let connect_str = "mysql://root:root@localhost:3306/teoneo";
     let mysql_pool = MySqlPoolOptions::new()
@@ -65,34 +64,58 @@ async fn get_gigachat_client() -> anyhow::Result<GigaClient> {
     Ok(client)
 }
 
-
 fn get_router(app_state: AppState) -> Router {
     let app = Router::new()
-        .route("/courses", axum::routing::get(handlers::courses::get_all_courses))
-        .route("/courses/{course_id}", axum::routing::get(handlers::courses::get_course))
-        .route("/courses/{course_id}/modules", axum::routing::get(handlers::modules::get_modules_for_course))
-        .route("/courses/{course_id}/modules/{module_id}", axum::routing::get(handlers::modules::get_module))
-        .route("/courses/{course_id}/modules/{module_id}/tasks", axum::routing::get(handlers::tasks::get_tasks_for_module))
-        .route("/courses/{course_id}/modules/{module_id}/tasks/{task_id}", axum::routing::get(handlers::tasks::get_task))
-        .route("/courses/{course_id}/modules/{module_id}/tasks/{task_id}/submit", axum::routing::post(handlers::tasks::submit_task))
-        .route("/courses/{course_id}/modules/{module_id}/tasks/{task_id}/progress", axum::routing::get(handlers::tasks::task_progress))
+        .route(
+            "/courses",
+            axum::routing::get(handlers::courses::get_all_courses),
+        )
+        .route(
+            "/courses/{course_id}",
+            axum::routing::get(handlers::courses::get_course),
+        )
+        .route(
+            "/courses/{course_id}/modules",
+            axum::routing::get(handlers::modules::get_modules_for_course),
+        )
+        .route(
+            "/courses/{course_id}/modules/{module_id}",
+            axum::routing::get(handlers::modules::get_module),
+        )
+        .route(
+            "/courses/{course_id}/modules/{module_id}/tasks",
+            axum::routing::get(handlers::tasks::get_tasks_for_module),
+        )
+        .route(
+            "/courses/{course_id}/modules/{module_id}/tasks/{task_id}",
+            axum::routing::get(handlers::tasks::get_task),
+        )
+        .route(
+            "/courses/{course_id}/modules/{module_id}/tasks/{task_id}/submit",
+            axum::routing::post(handlers::tasks::submit_task),
+        )
+        .route(
+            "/courses/{course_id}/modules/{module_id}/tasks/{task_id}/progress",
+            axum::routing::get(handlers::tasks::task_progress),
+        )
         .layer(CorsLayer::permissive().allow_origin(tower_http::cors::Any))
         .layer(CatchPanicLayer::custom(internal_server_error_handler))
         .layer(
             ServiceBuilder::new()
-            .layer(HandleErrorLayer::new(|err: BoxError| async move { // So compiler wont complain about some Infallable Trait shit
-                eprintln!("{}", err);
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    axum::Json(handlers::ErrorResponse::new(
-                        ErrorTypes::InternalError,
-                        "Internal error occured",
-                    ))
-                )
-            }))
-            .layer(BufferLayer::new(1024)) // Means it can process 1024 messages before backpressure is applied TODO: Adjust
-            .layer(RateLimitLayer::new(10, Duration::from_secs(1))), // Rate limti does not impl Clone, so we need to use BufferLayer TODO: Adjust
-            ) // Makes layers run in the background and messages are sent through the channels to them
+                .layer(HandleErrorLayer::new(|err: BoxError| async move {
+                    // So compiler wont complain about some Infallable Trait shit
+                    eprintln!("{}", err);
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        axum::Json(handlers::ErrorResponse::new(
+                            ErrorTypes::InternalError,
+                            "Internal error occured",
+                        )),
+                    )
+                }))
+                .layer(BufferLayer::new(1024)) // Means it can process 1024 messages before backpressure is applied TODO: Adjust
+                .layer(RateLimitLayer::new(10, Duration::from_secs(1))), // Rate limti does not impl Clone, so we need to use BufferLayer TODO: Adjust
+        ) // Makes layers run in the background and messages are sent through the channels to them
         .with_state(app_state);
     app
 }
@@ -104,10 +127,10 @@ async fn main() {
 
     let app_state = AppState {
         pool: get_db_connection().await.unwrap(),
-        ai: get_gigachat_client().await.unwrap()
+        ai: get_gigachat_client().await.unwrap(),
     };
     let router = get_router(app_state);
-    
+
     let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await.unwrap();
     axum::serve(listener, router).await.unwrap();
 }

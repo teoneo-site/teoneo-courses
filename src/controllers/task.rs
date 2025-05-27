@@ -3,9 +3,9 @@ use std::fmt::Display;
 use serde::{Deserialize, Serialize};
 use sqlx::MySqlPool;
 
-use crate::db;
+use crate::{db, AppState};
 
-use super::progress::ProgressStatus;
+use super::progress::{self, ProgressStatus};
 
 pub const PROMPT_TEMPLATE: &'static str = r#"
 Ты выступаешь как система оценки качества промптов для ИИ. Пользователь должен был написать промпт, соответствующий заданной задаче. Вот описание задачи:
@@ -180,6 +180,109 @@ pub async fn get_task(
     Ok(task)
 }
 
+pub async fn submit_quiz_task(
+    pool: &MySqlPool,
+    user_id: u32,
+    task_id: i32,
+    task_type: TaskType,
+    user_answers: serde_json::Value,
+) -> anyhow::Result<()> {
+    let answers_str = db::taskdb::fetch_task_answers(pool, task_type, task_id).await?;
+    let task_answers: Vec<u8> = answers_str
+        .split(";")
+        .map(|element| element.parse::<u8>().unwrap_or(0))
+        .collect();
+    let user_answers: QuizUserAnswer = serde_json::from_value(user_answers["data"].clone())?; // TODO: Handle
+
+    if task_answers.len() != user_answers.answers.len()
+        || task_answers
+            .iter()
+            .zip(&user_answers.answers)
+            .filter(|&(a, b)| a == b)
+            .count()
+            != task_answers.len()
+    {
+        progress::update_or_insert_status(
+            pool,
+            user_id,
+            task_id,
+            ProgressStatus::Failed,
+            serde_json::to_string(&user_answers).unwrap(),
+            0.0,
+            1,
+        )
+        .await?;
+    } else {
+        // Set status to SUCCESSS, submission to user_answers, score to 1.0, attempts to 1 if exists + 1
+        progress::update_or_insert_status(
+            pool,
+            user_id,
+            task_id,
+            ProgressStatus::Success,
+            serde_json::to_string(&user_answers).unwrap(),
+            1.0,
+            1,
+        )
+        .await?;
+    }
+    Ok(())
+}
+
+pub async fn process_prompt_task(
+    state: AppState,
+    user_id: u32,
+    task_id: i32,
+    user_answers: serde_json::Value,
+) -> anyhow::Result<()> {
+    tokio::spawn(async move {
+        // Get attemps, max attemps and additional_field
+        let pool = state.pool;
+        let mut client = state.ai;
+
+        let (question, add_prompt) = db::taskdb::fetch_prompt_details(&pool, task_id) // Again, task_id is 100% Prompt type
+            .await
+            .unwrap(); // This should not panic,only if Databse is broken, but then it will return 500 Server Internal Error on Panic
+        let user_prompt = user_answers["data"]["user_prompt"]
+            .as_str()
+            .unwrap_or_default();
+
+        let message = PROMPT_TEMPLATE
+            .replace("{question}", &question)
+            .replace("{user_prompt}", &user_prompt)
+            .replace(
+                "{additional_prompt}",
+                &add_prompt.unwrap_or("Нет доп. промпта".to_owned()),
+            );
+
+        let reply = client.send_message(message.into()).await.unwrap(); // Should not panic under normal circumstances, only if gigachat is down, then it returns 500 Server internal error
+        let reply_struct: PromptReply = serde_json::from_str(&reply.content).unwrap(); // Panics on rate limit by gigachat, but 500 for this kind of situation is ok I guess?
+
+        let mut json_submission: serde_json::Value =
+            serde_json::Value::Object(serde_json::Map::new());
+        json_submission["reply"] = reply_struct.reply.into();
+        json_submission["feedback"] = reply_struct.feedback.into();
+        let score: f32 = reply_struct.score;
+
+        progress::update_or_insert_status(
+            &pool,
+            user_id,
+            task_id,
+            if score < 0.4 {
+                ProgressStatus::Failed
+            } else {
+                ProgressStatus::Success
+            },
+            json_submission.to_string(),
+            score,
+            0,
+        )
+        .await
+        .unwrap(); // Should not panic, since at this point there is "eval" row that will get updated
+    });
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -204,7 +307,7 @@ mod tests {
         let str = String::from("LECTURE");
         let task_type: TaskType = str.into();
         assert_eq!(task_type, TaskType::Lecture);
-        
+
         let str = String::from("match");
         let task_type: TaskType = str.into();
         assert_eq!(task_type, TaskType::Match);
