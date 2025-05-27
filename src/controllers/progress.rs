@@ -2,8 +2,6 @@ use std::fmt::Display;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use sqlx::MySqlPool;
-
 use crate::{db, AppState};
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]

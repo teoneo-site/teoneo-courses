@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use sqlx::MySqlPool;
 
 use crate::{db, AppState};
 

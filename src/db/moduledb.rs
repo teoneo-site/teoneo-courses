@@ -1,6 +1,4 @@
 use redis::Commands;
-use redis::HashFieldExpirationOptions;
-use sqlx::MySqlPool;
 use sqlx::Row;
 
 use crate::controllers::module::ModuleInfo;
