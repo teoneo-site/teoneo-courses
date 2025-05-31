@@ -1,4 +1,4 @@
-use std::{any::Any, time::Duration};
+use std::{any::Any, env, time::Duration};
 
 use axum::{
     error_handling::HandleErrorLayer,
@@ -47,17 +47,17 @@ fn internal_server_error_handler(err: Box<dyn Any + Send + 'static>) -> Response
 }
 
 async fn get_db_pool() -> anyhow::Result<Pool<MySql>> {
-    let connect_str = "mysql://root:root@localhost:3306/teoneo";
+    let connect_str = env::var("DATABASE_URL").unwrap();
     let mysql_pool = MySqlPoolOptions::new()
         .max_connections(5)
         .acquire_timeout(Duration::from_secs(10))
-        .connect(connect_str)
+        .connect(&connect_str)
         .await?;
     Ok(mysql_pool)
 }
 
 async fn get_redis_pool() -> anyhow::Result<r2d2::Pool<redis::Client>> {
-    let client = redis::Client::open("redis://127.0.0.1/")?;
+    let client = redis::Client::open(env::var("REDIS_URL").unwrap())?;
     let pool = r2d2::Pool::builder().build(client).unwrap();
     Ok(pool)
 }
