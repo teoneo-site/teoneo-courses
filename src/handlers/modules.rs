@@ -29,6 +29,7 @@ pub async fn get_modules_for_course(
                     value["id"] = module.id.into();
                     value["course_id"] = module.course_id.into();
                     value["title"] = module.title.into();
+                    value["description"] = module.description.into();
                     data_array.push(value);
                 }
             }
