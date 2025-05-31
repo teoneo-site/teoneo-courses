@@ -9,6 +9,7 @@ pub struct CourseInfo {
     description: String,
     tags: Vec<String>,
     picture_url: String,
+    price: f64,
 }
 
 impl CourseInfo {
@@ -18,6 +19,7 @@ impl CourseInfo {
         description: String,
         tags: Vec<String>,
         picture_url: String,
+        price: f64
     ) -> Self {
         Self {
             id,
@@ -25,6 +27,7 @@ impl CourseInfo {
             description,
             tags,
             picture_url,
+            price,
         }
     }
 }
