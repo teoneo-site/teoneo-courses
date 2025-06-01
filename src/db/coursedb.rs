@@ -14,14 +14,15 @@ pub async fn fetch_courses(state: &AppState) -> anyhow::Result<Vec<CourseInfo>> 
         }
     }
 
-    let rows = sqlx::query("SELECT id, title, description, tags, picture_url, price FROM courses") // Todo: Pagination with LIMIT
+    let rows = sqlx::query("SELECT id, title, brief_description, full_description, tags, picture_url, price FROM courses") // Todo: Pagination with LIMIT
         .fetch_all(&state.pool)
         .await?;
     let mut result = Vec::new(); // Vec of Courses
     for row in rows {
         let id: i32 = row.try_get("id")?;
         let title: String = row.try_get("title")?;
-        let description: String = row.try_get("description")?;
+        let brief_description: String = row.try_get("brief_description")?;
+        let full_description: String = row.try_get("full_description")?;
         let tags = row
             .try_get::<String, _>("tags")?
             .split(",")
@@ -29,7 +30,7 @@ pub async fn fetch_courses(state: &AppState) -> anyhow::Result<Vec<CourseInfo>> 
             .collect::<Vec<String>>(); // tags are stored like "python,ai,cock" we transform it into ["py...", "ai", "cock"]
         let picture_url: String = row.try_get("picture_url")?;
         let price: f64 = row.try_get("price")?;
-        result.push(CourseInfo::new(id, title, description, tags, picture_url, price));
+        result.push(CourseInfo::new(id, title, brief_description, full_description, tags, picture_url, price));
     }   
 
     // If courses aren't cached -> cache them for an hour
@@ -47,13 +48,14 @@ pub async fn fetch_course(state: &AppState, id: i32) -> anyhow::Result<CourseInf
         }
     }
 
-    let row = sqlx::query("SELECT title, description, tags, picture_url, price FROM courses WHERE id = ?")
+    let row = sqlx::query("SELECT title, brief_description, full_description, tags, picture_url, price FROM courses WHERE id = ?")
         .bind(id)
         .fetch_one(&state.pool)
         .await?;
 
     let title: String = row.try_get("title")?;
-    let description: String = row.try_get("description")?;
+    let brief_description: String = row.try_get("brief_description")?;
+    let full_description: String = row.try_get("full_description")?;
     let tags = row
         .try_get::<String, _>("tags")?
         .split(",")
@@ -61,7 +63,7 @@ pub async fn fetch_course(state: &AppState, id: i32) -> anyhow::Result<CourseInf
         .collect::<Vec<String>>(); // tags are stored like "python,ai,cock" we transform it into ["py...", "ai", "cock"]
     let picture_url: String = row.try_get("picture_url")?;
     let price: f64 = row.try_get("price")?;
-    let course = CourseInfo::new(id, title, description, tags, picture_url, price);
+    let course = CourseInfo::new(id, title, brief_description, full_description, tags, picture_url, price);
 
     let course_str = serde_json::to_string(&course).unwrap(); // Isn't supposed to fail
     let _ : () = conn.set_ex(format!("course:{}", id), course_str, 3600).unwrap_or(());

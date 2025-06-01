@@ -6,7 +6,8 @@ use crate::{db, AppState};
 pub struct CourseInfo {
     id: i32,
     title: String,
-    description: String,
+    brief_description: String,
+    full_description: String,
     tags: Vec<String>,
     picture_url: String,
     price: f64,
@@ -16,7 +17,8 @@ impl CourseInfo {
     pub fn new(
         id: i32,
         title: String,
-        description: String,
+        brief_description: String,
+        full_description: String,
         tags: Vec<String>,
         picture_url: String,
         price: f64
@@ -24,7 +26,8 @@ impl CourseInfo {
         Self {
             id,
             title,
-            description,
+            brief_description,
+            full_description,
             tags,
             picture_url,
             price,
