@@ -12,7 +12,7 @@ JSON:
 }
 */
 
-use axum::{extract::{Path, State}, http::StatusCode, response::{IntoResponse, Response}};
+use axum::{extract::State, http::StatusCode, response::{IntoResponse, Response}};
 
 use crate::{common::token::Claims, controllers, handlers::{self, ErrorTypes}, AppState};
 

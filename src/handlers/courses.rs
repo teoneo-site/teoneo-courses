@@ -3,6 +3,7 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
+use axum_extra::extract::OptionalQuery;
 use serde_json::json;
 use crate::{
     controllers,
@@ -11,8 +12,8 @@ use crate::{
 };
 
 // PUBLIC GET /courses - Get a list of all available courses (for main page)
-pub async fn get_all_courses(State(state): State<AppState>) -> Result<Response, Response> {
-    match controllers::course::get_all_courses(&state).await {
+pub async fn get_courses(State(state): State<AppState>, OptionalQuery(ids): OptionalQuery<Vec<i32>>) -> Result<Response, Response> {
+    match controllers::course::get_courses(&state, ids).await {
         Ok(courses) => {
             let body = json!({
                 "data": courses,
@@ -35,7 +36,7 @@ pub async fn get_all_courses(State(state): State<AppState>) -> Result<Response, 
     };
 }
 
-// PUBLCI GET /course/{course_id} - Get info about a single course
+// PUBLIC GET /course/{course_id} - Get info about a single course
 pub async fn get_course(
     State(state): State<AppState>,
     Path(course_id): Path<i32>,

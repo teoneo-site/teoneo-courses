@@ -6,7 +6,7 @@ use axum::{
 use serde_json::json;
 
 use crate::{
-    common::{self, token::Claims},
+    common,
     controllers,
     handlers::{self, ErrorTypes},
     AppState,
