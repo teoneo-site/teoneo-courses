@@ -13,6 +13,24 @@ pub struct CourseInfo {
     price: f64,
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct ShortCourseInfo {
+    course_id: i32,
+    title: String,
+    brief_description: String
+}
+
+impl ShortCourseInfo {
+    pub fn new(course_id: i32, title: String, brief_description: String) -> Self {
+        Self { 
+            course_id: course_id, 
+            title: title, 
+            brief_description: brief_description 
+        }
+    }
+}
+
+
 impl CourseInfo {
     pub fn new(
         id: i32,

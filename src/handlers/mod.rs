@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 pub mod courses;
 pub mod modules;
 pub mod tasks;
+pub mod users;
 
 // Errors stuff
 #[derive(Serialize, Deserialize)]
