@@ -146,3 +146,21 @@ async fn main() {
     let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await.unwrap();
     axum::serve(listener, router).await.unwrap();
 }
+
+/*
+version: "3.8"
+
+services:
+  teoneo-courses:
+    image: teoneo-courses
+    ports:
+      - "8080:8080"
+    environment:
+      # Добавь свои переменные окружения сюда
+      # Пример:
+      - SECRET_WORD_JWT=VLADIVOSTOK
+      - SECRET_WORD_REFRESH=VLADIVOSTOK2000
+      - GIGACHAT_TOKEN=MGMzNGI3YzYtODk1NC00MTk4LThhMDgtNzI4NDk1M2ViNzZkOmY5NjliOWE2LTk1MjMtNDk2NC04NDgyLTk0NzA1M2JkMmNlYw==
+      - DATABASE_URL=mysql://root:root@172.17.0.1:3306/teoneo
+      - REDIS_URL=redis://172.17.0.1:6379
+ */
