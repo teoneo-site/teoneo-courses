@@ -17,15 +17,19 @@ pub struct CourseInfo {
 pub struct ShortCourseInfo {
     course_id: i32,
     title: String,
-    brief_description: String
+    brief_description: String,
+    tasks_passed: i32,
+    tasks_total: i32,
 }
 
 impl ShortCourseInfo {
-    pub fn new(course_id: i32, title: String, brief_description: String) -> Self {
+    pub fn new(course_id: i32, title: String, brief_description: String, tasks_passed: i32, tasks_total: i32) -> Self {
         Self { 
-            course_id: course_id, 
-            title: title, 
-            brief_description: brief_description 
+            course_id, 
+            title, 
+            brief_description,
+            tasks_passed,
+            tasks_total
         }
     }
 }

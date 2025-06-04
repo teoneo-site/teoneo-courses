@@ -14,7 +14,7 @@ use crate::{
     common::token::Claims,
     controllers::{
         self,
-        progress::ProgressStatus,
+        progress::{self, ProgressStatus},
         task::{process_prompt_task, TaskType},
     },
     db,
@@ -244,7 +244,18 @@ pub async fn submit_task(
                     .into_response());
             }
         }
-        TaskType::Lecture => {}
+        TaskType::Lecture => {
+            progress::update_or_insert_status(
+            &state,
+            user_id,
+            task_id,
+            ProgressStatus::Success,
+            "None".to_owned(),
+            5.0,
+            1,
+            )
+            .await.unwrap();
+        }
     };
 
     return Ok((StatusCode::ACCEPTED).into_response());
