@@ -13,8 +13,33 @@ use crate::{
 };
 
 #[derive(Deserialize)]
-struct IdsStruct {
+pub struct IdsStruct {
     ids: Vec<i32>,
+}
+
+// PUBLIC GET /courses - Get a list of all available courses (for main page)
+pub async fn get_all_courses(State(state): State<AppState>) -> Result<Response, Response> {
+    match controllers::course::get_all_courses(&state).await {
+        Ok(courses) => {
+            let body = json!({
+                "data": courses,
+            });
+
+            return Ok((StatusCode::OK, axum::Json(body)).into_response());
+        }
+        Err(why) => {
+            eprintln!("Why co: {}", why);
+            
+            return Err((
+                StatusCode::BAD_REQUEST,
+                axum::Json(handlers::ErrorResponse::new(
+                    ErrorTypes::InternalError,
+                    "Could not fetch courses",
+                )),
+            )
+                .into_response());
+        }
+    };
 }
 
 // PUBLIC GET /courses - Get a list of all available courses (for main page)
