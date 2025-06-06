@@ -4,8 +4,60 @@ use sqlx::Row;
 use crate::controllers::course::CourseInfo;
 use crate::AppState;
 
-pub async fn fetch_courses(state: &AppState) -> anyhow::Result<Vec<CourseInfo>> {
+pub async fn fetch_courses_by_ids(state: &AppState, ids: Vec<i32>) -> anyhow::Result<Vec<CourseInfo>> {
+    let mut conn = state.redis.get().unwrap();
+    let mut courses = Vec::new();
+    let mut ids_to_fetch = Vec::new();
 
+    for id in &ids {
+        if let Ok(val) = conn.get::<String, String>(format!("course:{}", id)) {
+            if let Ok(parsed_course) = serde_json::from_str::<CourseInfo>(&val) {
+                courses.push(parsed_course);
+                continue;
+            }
+        }
+        ids_to_fetch.push(*id);
+    }
+
+    if !ids_to_fetch.is_empty() {
+        let placeholders: Vec<String> = ids_to_fetch.iter().map(|_| "?".to_string()).collect();
+        let query = format!(
+            "SELECT id, title, brief_description, full_description, tags, picture_url, price FROM courses WHERE id IN ({})",
+            placeholders.join(", ")
+        );
+
+        let mut query_builder = sqlx::query(&query);
+        for id in &ids_to_fetch {
+            query_builder = query_builder.bind(id);
+        }
+
+        let rows = query_builder.fetch_all(&state.pool).await?;
+
+        for row in rows {
+            let id: i32 = row.try_get("id")?;
+            let title: String = row.try_get("title")?;
+            let brief_description: String = row.try_get("brief_description")?;
+            let full_description: String = row.try_get("full_description")?;
+            let tags = row
+                .try_get::<String, _>("tags")?
+                .split(",")
+                .map(|str| str.to_owned())
+                .collect::<Vec<String>>();
+            let picture_url: String = row.try_get("picture_url")?;
+            let price: f64 = row.try_get("price")?;
+            let course = CourseInfo::new(id, title, brief_description, full_description, tags, picture_url, price);
+
+            let course_str = serde_json::to_string(&course).unwrap(); // Isn't supposed to fail
+            conn.set_ex(format!("course:{}", id), course_str, 3600).unwrap_or(());
+
+            courses.push(course);
+        }
+    }
+
+    Ok(courses)
+}
+
+pub async fn fetch_all_courses(state: &AppState) -> anyhow::Result<Vec<CourseInfo>> {
     let mut conn = state.redis.get()?;
     if let Ok(val) = conn.get::<&str, String>("courses:all") { // If courses are cached
         if let Ok(parsed_vec) = serde_json::from_str::<Vec<CourseInfo>>(&val) { // Get them from redis
@@ -66,7 +118,7 @@ pub async fn fetch_course(state: &AppState, id: i32) -> anyhow::Result<CourseInf
     let course = CourseInfo::new(id, title, brief_description, full_description, tags, picture_url, price);
 
     let course_str = serde_json::to_string(&course).unwrap(); // Isn't supposed to fail
-    let _ : () = conn.set_ex(format!("course:{}", id), course_str, 3600).unwrap_or(());
+    conn.set_ex(format!("course:{}", id), course_str, 3600).unwrap_or(());
 
     Ok(course)
 }

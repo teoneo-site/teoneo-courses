@@ -1,6 +1,4 @@
 use anyhow::anyhow;
-use redis::Commands;
-use sqlx::MySqlPool;
 use sqlx::Row;
 
 use crate::controllers::course::ShortCourseInfo;

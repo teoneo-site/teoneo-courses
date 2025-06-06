@@ -82,6 +82,10 @@ fn get_router(app_state: AppState) -> Router {
             axum::routing::get(handlers::courses::get_all_courses),
         )
         .route(
+            "/courses/ids",
+            axum::routing::get(handlers::courses::get_courses_by_ids),
+        )
+        .route(
             "/courses/{course_id}",
             axum::routing::get(handlers::courses::get_course),
         )
