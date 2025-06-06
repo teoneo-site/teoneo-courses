@@ -56,8 +56,13 @@ impl CourseInfo {
 // Currently, there is really no need for this method in the controller,
 // you can just call fetch from the handler,
 // BUT maybe we'll need this in future for some settings kinda stuff
-pub async fn get_courses(pool: &AppState, ids: Option<Vec<i32>>) -> anyhow::Result<Vec<CourseInfo>> {
-    let courses = db::coursedb::fetch_courses(pool, ids).await?;
+pub async fn get_all_courses(pool: &AppState) -> anyhow::Result<Vec<CourseInfo>> {
+    let courses = db::coursedb::fetch_all_courses(pool).await?;
+    Ok(courses)
+}
+
+pub async fn get_courses_by_ids(pool: &AppState, ids: Vec<i32>) -> anyhow::Result<Vec<CourseInfo>> {
+    let courses = db::coursedb::fetch_courses_by_ids(pool, ids).await?;
     Ok(courses)
 }
 
