@@ -5,19 +5,23 @@ use crate::controllers::course::CourseInfo;
 use crate::AppState;
 
 pub async fn fetch_courses_by_ids(state: &AppState, ids: Vec<i32>) -> anyhow::Result<Vec<CourseInfo>> {
-    let mut conn = state.redis.get().unwrap();
+    
     let mut courses = Vec::new();
     let mut ids_to_fetch = Vec::new();
 
-    for id in &ids {
-        if let Ok(val) = conn.get::<String, String>(format!("course:{}", id)) {
-            if let Ok(parsed_course) = serde_json::from_str::<CourseInfo>(&val) {
-                courses.push(parsed_course);
-                continue;
+
+    if let Ok(mut conn) = state.redis.get() {
+        for id in &ids {
+            if let Ok(val) = conn.get::<String, String>(format!("course:{}", id)) {
+                if let Ok(parsed_course) = serde_json::from_str::<CourseInfo>(&val) {
+                    courses.push(parsed_course);
+                    continue;
+                }
             }
-        }
-        ids_to_fetch.push(*id);
+            ids_to_fetch.push(*id);
+        }   
     }
+    
 
     if !ids_to_fetch.is_empty() {
         let placeholders: Vec<String> = ids_to_fetch.iter().map(|_| "?".to_string()).collect();
@@ -33,6 +37,7 @@ pub async fn fetch_courses_by_ids(state: &AppState, ids: Vec<i32>) -> anyhow::Re
 
         let rows = query_builder.fetch_all(&state.pool).await?;
 
+
         for row in rows {
             let id: i32 = row.try_get("id")?;
             let title: String = row.try_get("title")?;
@@ -46,11 +51,14 @@ pub async fn fetch_courses_by_ids(state: &AppState, ids: Vec<i32>) -> anyhow::Re
             let picture_url: String = row.try_get("picture_url")?;
             let price: f64 = row.try_get("price")?;
             let course = CourseInfo::new(id, title, brief_description, full_description, tags, picture_url, price);
-
-            let course_str = serde_json::to_string(&course).unwrap(); // Isn't supposed to fail
-            conn.set_ex(format!("course:{}", id), course_str, 3600).unwrap_or(());
-
             courses.push(course);
+        }
+
+        if let Ok(mut conn) = state.redis.get() {
+            for course in courses.iter() {
+                let course_str = serde_json::to_string(&course).unwrap(); // Isn't supposed to fail
+                conn.set_ex(format!("course:{}", course.id), course_str, 3600).unwrap_or(());
+            }
         }
     }
 
@@ -58,11 +66,12 @@ pub async fn fetch_courses_by_ids(state: &AppState, ids: Vec<i32>) -> anyhow::Re
 }
 
 pub async fn fetch_all_courses(state: &AppState) -> anyhow::Result<Vec<CourseInfo>> {
-    let mut conn = state.redis.get()?;
-    if let Ok(val) = conn.get::<&str, String>("courses:all") { // If courses are cached
-        if let Ok(parsed_vec) = serde_json::from_str::<Vec<CourseInfo>>(&val) { // Get them from redis
-            println!("Cachedcourses");
-            return Ok(parsed_vec)
+    if let Ok(mut conn) = state.redis.get() { 
+        if let Ok(val) = conn.get::<&str, String>("courses:all") { // If courses are cached
+            if let Ok(parsed_vec) = serde_json::from_str::<Vec<CourseInfo>>(&val) { // Get them from redis
+                println!("Cachedcourses");
+                return Ok(parsed_vec)
+            }
         }
     }
 
@@ -86,17 +95,19 @@ pub async fn fetch_all_courses(state: &AppState) -> anyhow::Result<Vec<CourseInf
     }   
 
     // If courses aren't cached -> cache them for an hour
-    let result_str = serde_json::to_string(&result).unwrap();  // Isn't supposed to fail
-    let _: () = conn.set_ex("courses:all", result_str, 3600).unwrap_or(()); // Ignore error, because we dont really care, can't afford to break when cant set smth
+    if let Ok(mut conn) = state.redis.get() { 
+        let result_str = serde_json::to_string(&result).unwrap();  // Isn't supposed to fail
+        conn.set_ex("courses:all", result_str, 3600).unwrap_or(()); // Ignore error, because we dont really care, can't afford to break when cant set smth
+    }
     Ok(result)
 }
 
 pub async fn fetch_course(state: &AppState, id: i32) -> anyhow::Result<CourseInfo> {
-    let mut conn = state.redis.get().unwrap();
-
-    if let Ok(val) = conn.get::<String, String>(format!("course:{}", id)) {
-        if let Ok(parsed_course) = serde_json::from_str::<CourseInfo>(&val) {
-            return Ok(parsed_course)
+    if let Ok(mut conn) = state.redis.get() { 
+        if let Ok(val) = conn.get::<String, String>(format!("course:{}", id)) {
+            if let Ok(parsed_course) = serde_json::from_str::<CourseInfo>(&val) {
+                return Ok(parsed_course)
+            }
         }
     }
 
@@ -117,8 +128,10 @@ pub async fn fetch_course(state: &AppState, id: i32) -> anyhow::Result<CourseInf
     let price: f64 = row.try_get("price")?;
     let course = CourseInfo::new(id, title, brief_description, full_description, tags, picture_url, price);
 
-    let course_str = serde_json::to_string(&course).unwrap(); // Isn't supposed to fail
-    conn.set_ex(format!("course:{}", id), course_str, 3600).unwrap_or(());
+    if let Ok(mut conn) = state.redis.get() { 
+        let course_str = serde_json::to_string(&course).unwrap(); // Isn't supposed to fail
+        conn.set_ex(format!("course:{}", id), course_str, 3600).unwrap_or(());
+    }
 
     Ok(course)
 }
@@ -128,17 +141,21 @@ pub async fn validate_course_ownership(
     user_id: i32,
     course_id: i32,
 ) -> anyhow::Result<()> {
-    let mut conn = state.redis.get().unwrap();
-
     let cache_key = format!("ownership:{}:{}", user_id, course_id);
-    if let Ok(true) = conn.exists(&cache_key) {
-        return Ok(())
+    if let Ok(mut conn) = state.redis.get() { 
+        if let Ok(true) = conn.exists(&cache_key) {
+            return Ok(())
+        }
     }
+    
     sqlx::query("SELECT * FROM payments_history WHERE user_id = ? AND course_id = ? LIMIT 1") // Limit 1 for optimization
         .bind(user_id)
         .bind(course_id)
         .fetch_one(&state.pool)
         .await?;
-    let _ : () = conn.set_ex(&cache_key, "has", 300).unwrap_or(()); // Set any value, which means the row will be there
+
+    if let Ok(mut conn) = state.redis.get() { 
+        conn.set_ex(&cache_key, "has", 300).unwrap_or(()); // Set any value, which means the row will be there
+    }
     Ok(()) // At this point there is a row 100% which proves ownership
 }

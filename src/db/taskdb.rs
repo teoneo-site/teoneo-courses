@@ -13,11 +13,12 @@ pub async fn fetch_tasks_for_module(
     module_id: i32,
     user_id: Option<i32>,
 ) -> anyhow::Result<Vec<TaskShortInfo>> {
-    let mut conn = state.redis.get().unwrap();
     let cache_key = format!("module:{}:tasks:all", module_id);
-    if let Ok(val) = conn.get::<&str, String>(&cache_key) {
-        if let Ok(parsed_tasks) = serde_json::from_str::<Vec<TaskShortInfo>>(&val) {
-            return Ok(parsed_tasks)
+    if let Ok(mut conn) = state.redis.get() { 
+        if let Ok(val) = conn.get::<&str, String>(&cache_key) {
+            if let Ok(parsed_tasks) = serde_json::from_str::<Vec<TaskShortInfo>>(&val) {
+                return Ok(parsed_tasks)
+            }
         }
     }
 
@@ -48,8 +49,10 @@ pub async fn fetch_tasks_for_module(
         result.push(TaskShortInfo::new(id, module_id, title, task_type, status));
     }
 
-    let result_str = serde_json::to_string(&result).unwrap(); // Should not panic
-    let _ : () = conn.set_ex(&cache_key, result_str, 3600).unwrap_or(());
+    if let Ok(mut conn) = state.redis.get() { 
+        let result_str = serde_json::to_string(&result).unwrap(); // Should not panic
+        let _ : () = conn.set_ex(&cache_key, result_str, 3600).unwrap_or(());
+    }
     Ok(result)
 }
 
@@ -97,12 +100,13 @@ pub async fn fetch_task(
     task_id: i32,
     user_id: Option<i32>,
 ) -> anyhow::Result<Task> {
-    let mut conn = state.redis.get().unwrap();
     let cache_key = format!("task:{}", task_id);
-    if let Ok(val) = conn.get::<&str, String>(&cache_key) { // Cache is up to date (in terms of progress), becase we delete key, when updating progress
-        if let Ok(parsed_task) = serde_json::from_str(&val) {
-            return Ok(parsed_task)
-        } 
+    if let Ok(mut conn) = state.redis.get() { 
+        if let Ok(val) = conn.get::<&str, String>(&cache_key) { // Cache is up to date (in terms of progress), becase we delete key, when updating progress
+            if let Ok(parsed_task) = serde_json::from_str(&val) {
+                return Ok(parsed_task)
+            } 
+        }
     }
 
     let row = if let Some(user_id) = user_id {
@@ -214,8 +218,10 @@ pub async fn fetch_task(
         task_id, module_id, title, task_type, content, status, score,
     );
 
-    let task_str = serde_json::to_string(&task).unwrap(); // Should not panic
-    let _ : () = conn.set_ex(&cache_key, task_str, 3600).unwrap_or(());
+    if let Ok(mut conn) = state.redis.get() { 
+        let task_str = serde_json::to_string(&task).unwrap(); // Should not panic
+        let _ : () = conn.set_ex(&cache_key, task_str, 3600).unwrap_or(());
+    }
 
     Ok(task)
 }

@@ -1,4 +1,5 @@
 use anyhow::anyhow;
+use redis::Commands;
 use sqlx::Row;
 
 use crate::controllers::course::ShortCourseInfo;
@@ -8,7 +9,16 @@ use crate::controllers::user::UserInfoFull;
 use crate::AppState;
 
 
-pub async fn get_user_info(appstate: &AppState, user_id: u32) -> anyhow::Result<UserInfo> {
+pub async fn get_user_info(state: &AppState, user_id: u32) -> anyhow::Result<UserInfo> {
+    let cache_key = format!("user:{}", user_id);
+    if let Ok(mut conn) = state.redis.get() { 
+        if let Ok(val) = conn.get::<&str, String>(&cache_key) {
+            if let Ok(user_info_struct) = serde_json::from_str::<UserInfo>(&val) {
+                return Ok(user_info_struct)
+            }
+        }
+    }
+
     let query = "SELECT 
         u.username, 
         u.email
@@ -16,18 +26,30 @@ pub async fn get_user_info(appstate: &AppState, user_id: u32) -> anyhow::Result<
         WHERE u.id = ?";
     let row = sqlx::query(query)
         .bind(user_id)
-        .fetch_one(&appstate.pool)
+        .fetch_one(&state.pool)
         .await?;
-    let mut userinfo = UserInfo::default();
-    let username: String = row.try_get("username").unwrap(); // It exists in the row 100%, because, rows aren't empty => user eists
-    let email: String = row.try_get("email").unwrap(); // Same  here
-    userinfo.email = email;
-    userinfo.username = username;
 
+    let mut userinfo = UserInfo::default();
+    userinfo.email = row.try_get("email").unwrap();
+    userinfo.username = row.try_get("username").unwrap();
+
+    if let Ok(mut conn) = state.redis.get() { 
+        let result_str = serde_json::to_string(&userinfo).unwrap(); // Should not panic
+        conn.set_ex(cache_key, result_str, 3600).unwrap_or(()); // Don't care if it fails
+    }
     Ok(userinfo)
 }
 
-pub async fn get_user_info_all(appstate: &AppState, user_id: u32) -> anyhow::Result<UserInfoFull> {
+pub async fn get_user_info_all(state: &AppState, user_id: u32) -> anyhow::Result<UserInfoFull> {
+    let cache_key = format!("user:info:all:{}", user_id);
+    if let Ok(mut conn) = state.redis.get() { 
+        if let Ok(val) = conn.get::<&str, String>(&cache_key) {
+            if let Ok(info_struct) = serde_json::from_str::<UserInfoFull>(&val) {
+                return Ok(info_struct)
+            }
+        }
+    }
+
     let query = "SELECT 
         u.username, 
         u.email, 
@@ -53,7 +75,7 @@ pub async fn get_user_info_all(appstate: &AppState, user_id: u32) -> anyhow::Res
     WHERE u.id = ?";
     let rows = sqlx::query(query)
         .bind(user_id)
-        .fetch_all(&appstate.pool)
+        .fetch_all(&state.pool)
         .await?;
     if rows.is_empty() {
         return Err(sqlx::Error::RowNotFound.into())
@@ -81,14 +103,27 @@ pub async fn get_user_info_all(appstate: &AppState, user_id: u32) -> anyhow::Res
             courses.push(ShortCourseInfo::new(course_id, title, brief_description, tasks_passed, tasks_total));
         }
     }
-
-
     userinfo.courses = courses;
+
+    if let Ok(mut conn) = state.redis.get() { 
+        let result_str = serde_json::to_string(&userinfo).unwrap(); // Should not panic
+        conn.set_ex(cache_key, result_str, 3600).unwrap_or(());
+    }
+
     Ok(userinfo)
 }
 
 
-pub async fn get_course_info(appstate: &AppState, user_id: u32) -> anyhow::Result<CoursesInfo> {
+pub async fn get_course_info(state: &AppState, user_id: u32) -> anyhow::Result<CoursesInfo> {
+    let cache_key = format!("user:info:courses:{}", user_id);
+    if let Ok(mut conn) = state.redis.get() { 
+        if let Ok(val) = conn.get::<&str, String>(&cache_key) {
+            if let Ok(courses_info_struct) = serde_json::from_str::<CoursesInfo>(&val) {
+                return Ok(courses_info_struct)
+            }
+        }
+    }
+
     let query = "SELECT 
         c.id AS course_id, 
         c.title, 
@@ -112,7 +147,7 @@ pub async fn get_course_info(appstate: &AppState, user_id: u32) -> anyhow::Resul
     WHERE u.id = ?";
     let rows = sqlx::query(query)
         .bind(user_id)
-        .fetch_all(&appstate.pool)
+        .fetch_all(&state.pool)
         .await?;
 
     if rows.is_empty() {
@@ -135,6 +170,10 @@ pub async fn get_course_info(appstate: &AppState, user_id: u32) -> anyhow::Resul
         }
     }
     coursesinfo.courses = courses;
-
+        
+    if let Ok(mut conn) = state.redis.get() { 
+        let result_str = serde_json::to_string(&coursesinfo).unwrap();
+        conn.set_ex(cache_key, result_str, 3600).unwrap_or(());
+    }
     Ok(coursesinfo)
 }

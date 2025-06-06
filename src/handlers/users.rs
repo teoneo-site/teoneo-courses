@@ -30,7 +30,7 @@ pub struct UserInfoQuery {
     value: ValueInfo
 }
 
-async fn handle_result<T: Serialize>(fut: impl std::future::Future<Output = Result<T, anyhow::Error>>) -> Result<Response, Response> {
+async fn handle_result<T: Serialize>(fut: impl std::future::Future<Output = anyhow::Result<T>>) -> Result<Response, Response> {
     let mut json_obj = serde_json::Value::Object(serde_json::Map::new());
     match fut.await {
         Ok(info) => {

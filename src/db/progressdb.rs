@@ -28,12 +28,13 @@ pub async fn update_or_insert(
         .bind(score)
         .bind(attempts).execute(&state.pool).await?;
 
+    
+    let mut conn = state.redis.get().unwrap(); // If it failes to get a connection here it's very bad and data will be outdated, so panic better
     let cache_key = format!("progress:{}:{}", user_id, task_id);
-    let mut conn = state.redis.get().unwrap();
-
     let cache_key_task = format!("task:{}", task_id);
-    let _: () = conn.del(&cache_key).unwrap_or(());
-    let _: () = conn.del(&cache_key_task).unwrap_or(()); // Delete this, so when fetching a task progress will be updated
+    let cache_key_info_all = format!("user:info:all:{}", user_id);
+    let cache_key_info_courses = format!("user:info:courses:{}", user_id);
+    redis::cmd("DEL").arg(cache_key).arg(cache_key_task).arg(cache_key_info_all).arg(cache_key_info_courses).query(&mut conn).unwrap_or(());
     Ok(())
 }
 
@@ -43,12 +44,12 @@ pub async fn fetch_task_progress(
     task_id: i32,
 ) -> anyhow::Result<Progress> {
     let cache_key = format!("progress:{}:{}", user_id, task_id);
-    let mut conn = state.redis.get().map_err(|e| anyhow::anyhow!("Redis error: {}", e))?;
-
-    // Пробуем взять из кэша
-    if let Ok(cached) = conn.get::<_, String>(&cache_key) {
-        if let Ok(progress) = serde_json::from_str::<Progress>(&cached) {
-            return Ok(progress);
+    if let Ok(mut conn) = state.redis.get() { 
+         // Пробуем взять из кэша
+        if let Ok(cached) = conn.get::<_, String>(&cache_key) {
+            if let Ok(progress) = serde_json::from_str::<Progress>(&cached) {
+                return Ok(progress);
+            }
         }
     }
 
@@ -73,11 +74,12 @@ pub async fn fetch_task_progress(
         id, user_id, task_id, status, submission, score, attempts, updated_at,
     );
 
-    // Кэшируем результат на 5 минут
-    let _: () = conn
+    if let Ok(mut conn) = state.redis.get() { 
+        let _: () = conn
         .set_ex(&cache_key, serde_json::to_string(&progress)?, 300)
         .unwrap_or(()); // Ошибку кэша можно игнорировать
-
+    }
+    
     Ok(progress)
 }
 

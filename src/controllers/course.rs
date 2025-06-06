@@ -4,7 +4,7 @@ use crate::{db, AppState};
 
 #[derive(Serialize, Deserialize)]
 pub struct CourseInfo {
-    id: i32,
+    pub id: i32,
     title: String,
     brief_description: String,
     full_description: String,
