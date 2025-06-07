@@ -55,6 +55,7 @@ pub async fn get_user_info_all(state: &AppState, user_id: u32) -> anyhow::Result
         u.email, 
         c.id AS course_id, 
         c.title, 
+        c.picture_url,
         c.brief_description,
         (
             SELECT COUNT(*)
@@ -94,12 +95,12 @@ pub async fn get_user_info_all(state: &AppState, user_id: u32) -> anyhow::Result
         let course_id: Option<i32> = row.try_get("course_id")?;
         let title: Option<String> = row.try_get("title")?;
         let brief_description: Option<String> = row.try_get("brief_description")?;
-        let picture_url: String = row.try_get("picture_url")?;
+        let picture_url: Option<String> = row.try_get("picture_url")?;
         let tasks_passed: Option<i32> = row.try_get("tasks_passed")?;
         let tasks_total: Option<i32> = row.try_get("tasks_total")?;
 
-        if let (Some(course_id), Some(title), Some(brief_description), Some(tasks_passed), Some(tasks_total)) =
-            (course_id, title, brief_description, tasks_passed, tasks_total)
+        if let (Some(course_id), Some(title), Some(brief_description), Some(picture_url), Some(tasks_passed), Some(tasks_total)) =
+            (course_id, title, brief_description, picture_url, tasks_passed, tasks_total)
         {
             courses.push(ShortCourseInfo::new(course_id, title, brief_description, picture_url, tasks_passed, tasks_total));
         }
@@ -129,6 +130,7 @@ pub async fn get_course_info(state: &AppState, user_id: u32) -> anyhow::Result<C
         c.id AS course_id, 
         c.title, 
         c.brief_description,
+        c.picture_url
         (
             SELECT COUNT(*)
             FROM modules m
@@ -161,12 +163,12 @@ pub async fn get_course_info(state: &AppState, user_id: u32) -> anyhow::Result<C
         let course_id: Option<i32> = row.try_get("course_id")?;
         let title: Option<String> = row.try_get("title")?;
         let brief_description: Option<String> = row.try_get("brief_description")?;
-        let picture_url: String = row.try_get("picture_url")?;
+        let picture_url: Option<String> = row.try_get("picture_url")?;
         let tasks_passed: Option<i32> = row.try_get("tasks_passed")?;
         let tasks_total: Option<i32> = row.try_get("tasks_total")?;
 
-        if let (Some(course_id), Some(title), Some(brief_description), Some(tasks_passed), Some(tasks_total)) =
-            (course_id, title, brief_description, tasks_passed, tasks_total)
+        if let (Some(course_id), Some(title), Some(brief_description), Some(picture_url), Some(tasks_passed), Some(tasks_total)) =
+            (course_id, title, brief_description, picture_url, tasks_passed, tasks_total)
         {
             courses.push(ShortCourseInfo::new(course_id, title, brief_description, picture_url, tasks_passed, tasks_total));
         }
