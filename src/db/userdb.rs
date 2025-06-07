@@ -130,7 +130,7 @@ pub async fn get_course_info(state: &AppState, user_id: u32) -> anyhow::Result<C
         c.id AS course_id, 
         c.title, 
         c.brief_description,
-        c.picture_url
+        c.picture_url,
         (
             SELECT COUNT(*)
             FROM modules m
