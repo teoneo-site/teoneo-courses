@@ -7,9 +7,7 @@ use axum_extra::extract::Query;
 use serde::Deserialize;
 use serde_json::json;
 use crate::{
-    controllers,
-    handlers::{self, ErrorTypes},
-    AppState,
+    common::token::Claims, controllers, db, handlers::{self, ErrorTypes}, AppState
 };
 
 #[derive(Deserialize)]
@@ -93,4 +91,27 @@ pub async fn get_course(
                 .into_response());
         }
     };
+}
+
+pub async fn get_course_progress(State(state): State<AppState>, Path(course_id): Path<i32>, claims: Claims) -> Result<Response, Response> {
+    let user_id = claims.id;
+    match controllers::course::get_course_progress(&state, course_id, user_id).await {
+        Ok(progress) => {
+            let body = json!({
+                "data": progress,
+            });
+            return Ok((StatusCode::OK, axum::Json(body)).into_response())
+        }
+        Err(why) => {
+            eprintln!("Why co: {}", why);
+            return Err((
+                StatusCode::BAD_REQUEST,
+                axum::Json(handlers::ErrorResponse::new(
+                    ErrorTypes::InternalError,
+                    "Could not fetch the course",
+                )),
+            )
+                .into_response());
+        }
+    }
 }
