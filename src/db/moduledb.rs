@@ -28,8 +28,6 @@ pub async fn fetch_modules_for_course(
         let title: String = row.try_get("title")?;
         let description: String = row.try_get("description")?;
         let theory: String = row.try_get("theory")?;
-        let picture_url: String = row.try_get("picture_url")?;
-        let video_url: String = row.try_get("video_url")?;
 
         result.push(ModuleInfo::new(
             id,
@@ -37,8 +35,6 @@ pub async fn fetch_modules_for_course(
             title,
             description,
             theory,
-            picture_url,
-            video_url,
         ));
     }
     if let Ok(mut conn) = state.redis.get() { 
@@ -72,16 +68,12 @@ pub async fn fetch_module(
     let title: String = row.try_get("title")?;
     let description: String = row.try_get("description")?;
     let theory: String = row.try_get("theory")?;
-    let picture_url: String = row.try_get("picture_url")?;
-    let video_url: String = row.try_get("video_url")?;
     let module = ModuleInfo::new(
         module_id,
         course_id,
         title,
         description,
         theory,
-        picture_url,
-        video_url,
     );
 
     if let Ok(mut conn) = state.redis.get() { 

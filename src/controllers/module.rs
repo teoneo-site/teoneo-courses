@@ -9,8 +9,6 @@ pub struct ModuleInfo {
     pub title: String,
     pub description: String,
     pub theory: String,
-    pub picture_url: String,
-    pub video_url: String,
 }
 
 impl ModuleInfo {
@@ -20,8 +18,6 @@ impl ModuleInfo {
         title: String,
         description: String,
         theory: String,
-        picture_url: String,
-        video_url: String,
     ) -> Self {
         Self {
             id,
@@ -29,8 +25,6 @@ impl ModuleInfo {
             title,
             description,
             theory,
-            picture_url,
-            video_url,
         }
     }
 }
