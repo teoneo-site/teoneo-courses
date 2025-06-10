@@ -30,11 +30,13 @@ pub async fn update_or_insert(
 
     
     let mut conn = state.redis.get().unwrap(); // If it failes to get a connection here it's very bad and data will be outdated, so panic better
+    // TODO: избавиться от этого позора
     let cache_key = format!("progress:{}:{}", user_id, task_id);
     let cache_key_task = format!("task:{}", task_id);
     let cache_key_info_all = format!("user:info:all:{}", user_id);
     let cache_key_info_courses = format!("user:info:courses:{}", user_id);
-    redis::cmd("DEL").arg(cache_key).arg(cache_key_task).arg(cache_key_info_all).arg(cache_key_info_courses).query(&mut conn).unwrap_or(());
+    let cache_key_stats = format!("user:stats:{}", user_id);
+    redis::cmd("DEL").arg(cache_key).arg(cache_key_task).arg(cache_key_info_all).arg(cache_key_info_courses).arg(cache_key_stats).query(&mut conn).unwrap_or(());
     Ok(())
 }
 

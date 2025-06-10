@@ -114,9 +114,9 @@ pub async fn fetch_task(
             "SELECT 
             t.title, t.type,
             q.question as qquestion, q.possible_answers, q.is_multiple,
-            l.text, l.picture_url, l.video_url,
-            m.question, m.left_items, m.right_items, m.picture_url,
-            p.question as pquestion, p.picture_url, p.max_attempts,
+            l.text,
+            m.question, m.left_items, m.right_items,
+            p.question as pquestion, p.max_attempts,
             pr.status, pr.score
             FROM tasks t
                 LEFT JOIN quizzes q ON t.id = q.task_id AND t.type = 'Quiz'
@@ -135,9 +135,9 @@ pub async fn fetch_task(
         sqlx::query(
             "SELECT t.title, t.type,
                     q.question as qquestion, q.possible_answers, q.is_multiple,
-                    l.text, l.picture_url, l.video_url,
-                    m.question, m.left_items, m.right_items, m.picture_url,
-                    p.question as pquestion, p.picture_url, p.max_attempts
+                    l.text,
+                    m.question, m.left_items, m.right_items,,
+                    p.question as pquestion, p.max_attempts
             FROM tasks t
                 LEFT JOIN quizzes q ON t.id = q.task_id AND t.type = 'Quiz'
                 LEFT JOIN lectures l ON t.id = l.task_id AND t.type = 'Lecture'
@@ -171,45 +171,35 @@ pub async fn fetch_task(
             println!("here");
             let possible_answers: String = row.try_get("possible_answers")?;
             let is_multiple: bool = row.try_get("is_multiple")?;
-            let picture_url: Option<String> = row.try_get("picture_url")?;
 
             serde_json::json!({
                 "question": question,
                 "possible_answers": possible_answers.split(';').collect::<Vec<&str>>(),
                 "is_multiple": is_multiple,
-                "picture_url": picture_url
             })
         }
         TaskType::Lecture => {
             let text: String = row.try_get("text")?;
-            let picture_url: Option<String> = row.try_get("picture_url")?;
-            let video_url: Option<String> = row.try_get("video_url")?;
             serde_json::json!({
                 "text": text,
-                "picture_url": picture_url,
-                "video_url": video_url
             })
         }
         TaskType::Match => {
             let question: String = row.try_get("question")?;
             let left_items: String = row.try_get("left_items")?;
             let right_items: String = row.try_get("right_items")?;
-            let picture_url: Option<String> = row.try_get("picture_url")?;
 
             serde_json::json!({
                 "question": question,
                 "left_items": left_items.split(';').collect::<Vec<&str>>(),
                 "right_items": right_items.split(';').collect::<Vec<&str>>(),
-                "picture_url": picture_url,
             })
         }
         TaskType::Prompt => {
             let question: String = row.try_get("pquestion")?;
-            let picture_url: Option<String> = row.try_get("picture_url")?;
             let max_attempts: i32 = row.try_get("max_attempts")?;
             serde_json::json!({
                 "question": question,
-                "picture_url": picture_url,
                 "max_attempts": max_attempts
             })
         }

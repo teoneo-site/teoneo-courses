@@ -36,7 +36,7 @@ pub async fn get_user_info(state: &AppState, user_id: u32) -> anyhow::Result<Use
 
     if let Ok(mut conn) = state.redis.get() { 
         let result_str = serde_json::to_string(&userinfo).unwrap(); // Should not panic
-        conn.set_ex(cache_key, result_str, 3600).unwrap_or(()); // Don't care if it fails
+        conn.set_ex(cache_key, result_str, 300).unwrap_or(()); // Don't care if it fails
     }
     Ok(userinfo)
 }
@@ -110,7 +110,7 @@ pub async fn get_user_info_all(state: &AppState, user_id: u32) -> anyhow::Result
 
     if let Ok(mut conn) = state.redis.get() { 
         let result_str = serde_json::to_string(&userinfo).unwrap(); // Should not panic
-        conn.set_ex(cache_key, result_str, 3600).unwrap_or(());
+        conn.set_ex(cache_key, result_str, 300).unwrap_or(());
     }
 
     Ok(userinfo)
@@ -178,12 +178,21 @@ pub async fn get_course_info(state: &AppState, user_id: u32) -> anyhow::Result<C
         
     if let Ok(mut conn) = state.redis.get() { 
         let result_str = serde_json::to_string(&coursesinfo).unwrap();
-        conn.set_ex(cache_key, result_str, 3600).unwrap_or(());
+        conn.set_ex(cache_key, result_str, 120).unwrap_or(());
     }
     Ok(coursesinfo)
 }
 
 pub async fn get_user_stats(state: &AppState, user_id: u32) -> anyhow::Result<controllers::user::UserStats> {
+    let cache_key = format!("user:stats:{}", user_id);
+    if let Ok(mut conn) = state.redis.get() { 
+        if let Ok(val) = conn.get::<&str, String>(&cache_key) {
+            if let Ok(stats_info) = serde_json::from_str::<controllers::user::UserStats>(&val) {
+                return Ok(stats_info)
+            }
+        }
+    }
+
     let query = "
         SELECT 
             (SELECT COUNT(DISTINCT course_id) 
@@ -223,6 +232,10 @@ pub async fn get_user_stats(state: &AppState, user_id: u32) -> anyhow::Result<co
     let courses_owned: u32 = row.try_get("courses_owned")?;
     let courses_started: u32 = row.try_get("courses_started")?;
     let courses_completed: u32 = row.try_get("courses_completed")?;
-
-    Ok(controllers::user::UserStats { courses_owned, courses_started, courses_completed })
+    let info = controllers::user::UserStats { courses_owned, courses_started, courses_completed };
+    if let Ok(mut conn) = state.redis.get() { 
+        let result_str = serde_json::to_string(&info).unwrap();
+        conn.set_ex(cache_key, result_str, 120).unwrap_or(());
+    }
+    Ok(info)
 }
