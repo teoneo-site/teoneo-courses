@@ -149,11 +149,11 @@ pub async fn validate_course_ownership(
         }
     }
     
-    sqlx::query("SELECT * FROM payments_history WHERE user_id = ? AND course_id = ? LIMIT 1") // Limit 1 for optimization
+    sqlx::query("SELECT * FROM user_courses WHERE user_id = ? AND course_id = ? LIMIT 1") // Limit 1 for optimization
         .bind(user_id)
         .bind(course_id)
         .fetch_one(&state.pool)
-        .await?;
+        .await?; // returns Err(RowNotFound) if no rows
 
     if let Ok(mut conn) = state.redis.get() { 
         conn.set_ex(&cache_key, "has", 300).unwrap_or(()); // Set any value, which means the row will be there
@@ -179,7 +179,7 @@ pub async fn get_course_progress(state: &AppState, user_id: u32, course_id: i32)
             WHERE m.course_id = c.id AND tp.user_id = u.id AND tp.status = 'SUCCESS'
         ) AS tasks_passed
     FROM users u
-    LEFT JOIN payments_history p ON p.user_id = u.id
+    LEFT JOIN user_courses p ON p.user_id = u.id
     LEFT JOIN courses c ON p.course_id = c.id
     WHERE u.id = ? AND c.id = ?";
     let row = sqlx::query(query)

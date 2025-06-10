@@ -72,7 +72,7 @@ pub async fn get_user_info_all(state: &AppState, user_id: u32) -> anyhow::Result
             WHERE m.course_id = c.id AND tp.user_id = u.id AND tp.status = 'SUCCESS'
         ) AS tasks_passed
     FROM users u
-    LEFT JOIN payments_history p ON p.user_id = u.id
+    LEFT JOIN user_courses p ON p.user_id = u.id
     LEFT JOIN courses c ON p.course_id = c.id
     WHERE u.id = ?";
     let rows = sqlx::query(query)
@@ -146,7 +146,7 @@ pub async fn get_course_info(state: &AppState, user_id: u32) -> anyhow::Result<C
             WHERE m.course_id = c.id AND tp.user_id = u.id AND tp.status = 'SUCCESS'
         ) AS tasks_passed
     FROM users u
-    LEFT JOIN payments_history p ON p.user_id = u.id
+    LEFT JOIN user_courses p ON p.user_id = u.id
     LEFT JOIN courses c ON p.course_id = c.id
     WHERE u.id = ?";
     let rows = sqlx::query(query)
@@ -187,7 +187,7 @@ pub async fn get_user_stats(state: &AppState, user_id: u32) -> anyhow::Result<co
     let query = "
         SELECT 
             (SELECT COUNT(DISTINCT course_id) 
-             FROM payments_history 
+             FROM user_courses 
              WHERE user_id = ?) AS courses_owned,
             (SELECT COUNT(DISTINCT m.course_id) 
              FROM task_progress tp
