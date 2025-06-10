@@ -136,7 +136,7 @@ pub async fn fetch_task(
             "SELECT t.title, t.type,
                     q.question as qquestion, q.possible_answers, q.is_multiple,
                     l.text,
-                    m.question, m.left_items, m.right_items,,
+                    m.question, m.left_items, m.right_items,
                     p.question as pquestion, p.max_attempts
             FROM tasks t
                 LEFT JOIN quizzes q ON t.id = q.task_id AND t.type = 'Quiz'
