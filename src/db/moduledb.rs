@@ -18,7 +18,7 @@ pub async fn fetch_modules_for_course(
     }
 
     let rows =
-        sqlx::query("SELECT id, title, description, theory, picture_url, video_url FROM modules WHERE course_id = ?")// Todo: Pagination with LIMIT
+        sqlx::query("SELECT id, title, description, theory FROM modules WHERE course_id = ?")// Todo: Pagination with LIMIT
             .bind(course_id)
             .fetch_all(&state.pool)
             .await?;
@@ -59,7 +59,7 @@ pub async fn fetch_module(
         }
     }
 
-    let row = sqlx::query("SELECT title, description, theory, picture_url, video_url FROM modules WHERE course_id = ? AND id = ?")
+    let row = sqlx::query("SELECT title, description, theory FROM modules WHERE course_id = ? AND id = ?")
         .bind(course_id)
         .bind(module_id)
         .fetch_one(&state.pool)
