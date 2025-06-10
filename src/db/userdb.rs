@@ -2,6 +2,7 @@ use anyhow::anyhow;
 use redis::Commands;
 use sqlx::Row;
 
+use crate::controllers;
 use crate::controllers::course::ShortCourseInfo;
 use crate::controllers::user::CoursesInfo;
 use crate::controllers::user::UserInfo;
@@ -180,4 +181,48 @@ pub async fn get_course_info(state: &AppState, user_id: u32) -> anyhow::Result<C
         conn.set_ex(cache_key, result_str, 3600).unwrap_or(());
     }
     Ok(coursesinfo)
+}
+
+pub async fn get_user_stats(state: &AppState, user_id: u32) -> anyhow::Result<controllers::user::UserStats> {
+    let query = "
+        SELECT 
+            (SELECT COUNT(DISTINCT course_id) 
+             FROM payments_history 
+             WHERE user_id = ?) AS courses_owned,
+            (SELECT COUNT(DISTINCT m.course_id) 
+             FROM task_progress tp
+             JOIN tasks t ON tp.task_id = t.id
+             JOIN modules m ON t.module_id = m.id
+             WHERE tp.user_id = ?) AS courses_started,
+            (SELECT COUNT(DISTINCT m.course_id)
+             FROM modules m
+             JOIN (
+                 SELECT t.module_id, COUNT(*) as total_tasks
+                 FROM tasks t
+                 GROUP BY t.module_id
+             ) t ON m.id = t.module_id
+             JOIN (
+                 SELECT t.module_id, COUNT(*) as completed_tasks
+                 FROM task_progress tp
+                 JOIN tasks t ON tp.task_id = t.id
+                 WHERE tp.user_id = ? AND tp.status = 'SUCCESS'
+                 GROUP BY t.module_id
+             ) tc ON m.id = tc.module_id
+             WHERE t.total_tasks = tc.completed_tasks
+             GROUP BY m.course_id
+             HAVING COUNT(DISTINCT m.id) = (
+                 SELECT COUNT(*) 
+                 FROM modules m2 
+                 WHERE m2.course_id = m.course_id
+             )) AS courses_completed
+    ";
+    let row = sqlx::query(query)
+        .bind(user_id)
+        .fetch_one(&state.pool)
+        .await?;
+    let courses_owned: u32 = row.try_get("courses_owned")?;
+    let courses_started: u32 = row.try_get("courses_started")?;
+    let courses_completed: u32 = row.try_get("courses_completed")?;
+
+    Ok(controllers::user::UserStats { courses_owned, courses_started, courses_completed })
 }

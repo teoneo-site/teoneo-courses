@@ -69,3 +69,23 @@ pub async fn get_user_info_and_courses(
         }
     }
 }
+
+pub async fn get_user_stats(State(state): State<AppState>, claims: Claims) -> Result<Response, Response> {
+    let user_id = claims.id;
+    match controllers::user::get_user_stats(&state, user_id).await {
+        Ok(stats) => {
+            return Ok((StatusCode::OK, axum::Json(stats)).into_response())
+        }
+        Err(why) => {
+            eprintln!("Why failed to fetch stats: {}", why);
+            return Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                axum::Json(handlers::ErrorResponse::new(
+                    ErrorTypes::InternalError,
+                    "Could not fetch user stats, probably user does not exist",
+                )), // Should not panic, because struct is always valid for converting into JSON
+            )
+                .into_response());
+        }
+    }
+}
