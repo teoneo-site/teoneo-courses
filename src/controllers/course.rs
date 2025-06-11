@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use crate::{db, AppState};
 
 #[derive(Serialize, Deserialize)]
-pub struct CourseInfo {
+pub struct BasicCourseInfo {
     pub id: i32,
     title: String,
     brief_description: String,
@@ -11,6 +11,47 @@ pub struct CourseInfo {
     tags: Vec<String>,
     picture_url: String,
     price: f64,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct ExpandedCourseInfo {
+    pub id: i32,
+    title: String,
+    brief_description: String,
+    full_description: String,
+    tags: Vec<String>,
+    picture_url: String,
+    price: f64,
+    has_course: bool,
+    tasks_passed: Option<i32>,
+    tasks_total: Option<i32>,
+}
+impl ExpandedCourseInfo {
+    pub fn new(
+        id: i32,
+        title: String,
+        brief_description: String,
+        full_description: String,
+        tags: Vec<String>,
+        picture_url: String,
+        price: f64,
+        has_course: bool,
+        tasks_passed: Option<i32>,
+        tasks_total: Option<i32>,
+    ) -> Self {
+        Self {
+            id,
+            title,
+            brief_description,
+            full_description,
+            tags,
+            picture_url,
+            price,
+            has_course,
+            tasks_passed,
+            tasks_total,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -22,14 +63,6 @@ pub struct ShortCourseInfo {
     tasks_passed: i32,
     tasks_total: i32,
 }
-
-#[derive(Serialize, Deserialize, Default)]
-pub struct CourseProgress {
-    pub course_id: i32,
-    pub tasks_passed: i32,
-    pub tasks_total: i32,
-}
-
 impl ShortCourseInfo {
     pub fn new(course_id: i32, title: String, brief_description: String, picture_url: String, tasks_passed: i32, tasks_total: i32) -> Self {
         Self { 
@@ -43,8 +76,16 @@ impl ShortCourseInfo {
     }
 }
 
+#[derive(Serialize, Deserialize, Default)]
+pub struct CourseProgress {
+    pub course_id: i32,
+    pub tasks_passed: i32,
+    pub tasks_total: i32,
+}
 
-impl CourseInfo {
+
+
+impl BasicCourseInfo {
     pub fn new(
         id: i32,
         title: String,
@@ -69,13 +110,26 @@ impl CourseInfo {
 // Currently, there is really no need for this method in the controller,
 // you can just call fetch from the handler,
 // BUT maybe we'll need this in future for some settings kinda stuff
-pub async fn get_all_courses(pool: &AppState) -> anyhow::Result<Vec<CourseInfo>> {
+pub async fn get_all_courses(pool: &AppState) -> anyhow::Result<Vec<BasicCourseInfo>> {
     let courses = db::coursedb::fetch_all_courses(pool).await?;
     Ok(courses)
 }
 
-pub async fn get_courses_by_ids(pool: &AppState, ids: Vec<i32>) -> anyhow::Result<Vec<CourseInfo>> {
-    let courses = db::coursedb::fetch_courses_by_ids(pool, ids).await?;
+pub async fn add_course_to_favourite(pool: &AppState, user_id: u32, course_id: i32) -> anyhow::Result<()> {
+    db::coursedb::add_course_to_favourite(pool, user_id, course_id).await
+}
+pub async fn get_favourite_courses(pool: &AppState, user_id: u32) -> anyhow::Result<Vec<i32>> {
+    let ids = db::coursedb::get_favourite_courses(&pool, user_id).await?;
+    Ok(ids)
+}
+
+pub async fn get_courses_by_ids_expanded(pool: &AppState, ids: Vec<i32>, user_id: u32) -> anyhow::Result<Vec<ExpandedCourseInfo>> {
+    let courses = db::coursedb::fetch_courses_by_ids_expanded(pool, ids, user_id).await?;
+    Ok(courses)
+}
+
+pub async fn get_courses_by_ids_basic(pool: &AppState, ids: Vec<i32>) -> anyhow::Result<Vec<BasicCourseInfo>> {
+    let courses = db::coursedb::fetch_courses_by_ids_basic(pool, ids).await?;
     Ok(courses)
 }
 
@@ -87,7 +141,7 @@ pub async fn get_course_progress(pool: &AppState, course_id: i32, user_id: u32) 
 // Currently, there is really no need for this method in the controller,
 // you can just call fetch from the handler,
 // BUT maybe we'll need this in future for some settings kinda stuff
-pub async fn get_course(state: &AppState, id: i32) -> anyhow::Result<CourseInfo> {
+pub async fn get_course(state: &AppState, id: i32) -> anyhow::Result<BasicCourseInfo> {
     let course = db::coursedb::fetch_course(state, id).await?;
     Ok(course)
 }

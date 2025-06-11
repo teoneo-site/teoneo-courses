@@ -69,7 +69,7 @@ pub async fn get_tasks_for_module(
         Err(why) => {
             eprintln!("Why failed: {}", why);
             return Err((
-                StatusCode::BAD_REQUEST,
+                StatusCode::INTERNAL_SERVER_ERROR,
                 axum::Json(handlers::ErrorResponse::new(
                     ErrorTypes::InternalError,
                     "Could not fetch tasks",
@@ -168,7 +168,7 @@ pub async fn submit_task(
         Err(why) => {
             eprintln!("Why: {}", why);
             return Err((
-                StatusCode::BAD_REQUEST,
+                StatusCode::INTERNAL_SERVER_ERROR,
                 axum::Json(handlers::ErrorResponse::new(
                     ErrorTypes::InternalError,
                     "Could not fetch the task type. Task doesnt exist",
@@ -291,7 +291,7 @@ pub async fn task_progress(
         Err(why) => {
             eprintln!("Could not get progress (handler): {}", why);
             return Err((
-                StatusCode::BAD_REQUEST,
+                StatusCode::INTERNAL_SERVER_ERROR,
                 axum::Json(handlers::ErrorResponse::new(
                     ErrorTypes::InternalError,
                     "Could not fetch the task progress",

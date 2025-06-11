@@ -102,6 +102,14 @@ fn get_router(app_state: AppState) -> Router {
             axum::routing::get(handlers::modules::get_modules_for_course),
         )
         .route(
+            "/courses/{course_id}/favour",
+            axum::routing::post(handlers::courses::add_course_to_favourite)
+        )
+        .route(
+            "/courses/favourite",
+            axum::routing::get(handlers::courses::get_favourite_courses)
+        )
+        .route(
             "/courses/{course_id}/modules/{module_id}",
             axum::routing::get(handlers::modules::get_module),
         )
