@@ -23,9 +23,9 @@ pub struct UserInfo {
 
 #[derive(Serialize, Deserialize)]
 pub struct UserStats {
-    pub courses_owned: u32,
-    pub courses_started: u32,
-    pub courses_completed: u32,
+    pub courses_owned: i64,
+    pub courses_started: i64,
+    pub courses_completed: i64,
 }
 
 pub async fn get_user_info_all(app_state: &AppState, user_id: u32) -> anyhow::Result<UserInfoFull> {

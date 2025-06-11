@@ -231,9 +231,9 @@ pub async fn get_user_stats(state: &AppState, user_id: u32) -> anyhow::Result<co
         .bind(user_id)
         .fetch_one(&state.pool)
         .await?;
-    let courses_owned: u32 = row.try_get("courses_owned")?;
-    let courses_started: u32 = row.try_get("courses_started")?;
-    let courses_completed: u32 = row.try_get("courses_completed")?;
+    let courses_owned: i64 = row.try_get("courses_owned")?;
+    let courses_started: i64 = row.try_get("courses_started")?;
+    let courses_completed: i64 = row.try_get("courses_completed").unwrap_or(0);
     let info = controllers::user::UserStats { courses_owned, courses_started, courses_completed };
     if let Ok(mut conn) = state.redis.get() { 
         let result_str = serde_json::to_string(&info).unwrap();
