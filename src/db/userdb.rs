@@ -227,6 +227,8 @@ pub async fn get_user_stats(state: &AppState, user_id: u32) -> anyhow::Result<co
     ";
     let row = sqlx::query(query)
         .bind(user_id)
+        .bind(user_id)
+        .bind(user_id)
         .fetch_one(&state.pool)
         .await?;
     let courses_owned: u32 = row.try_get("courses_owned")?;
