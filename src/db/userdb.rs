@@ -169,14 +169,14 @@ pub async fn get_user_stats(state: &AppState, user_id: u32) -> anyhow::Result<co
                  WHERE m2.course_id = m.course_id
              )) AS courses_completed
     ";
-    let row = sqlx::query_as::<_, (i64, i64, i64)>(query)
+    let row = sqlx::query_as::<_, (i64, i64, Option<i64>)>(query)
         .bind(user_id)
         .bind(user_id)
         .bind(user_id)
         .fetch_one(&state.pool)
         .await?;
 
-    let info = controllers::user::UserStats { courses_owned: row.0, courses_started: row.1, courses_completed: row.2 };
+    let info = controllers::user::UserStats { courses_owned: row.0, courses_started: row.1, courses_completed: row.2.unwrap_or(0) };
     if let Ok(mut conn) = state.redis.get() { 
         let result_str = serde_json::to_string(&info).unwrap();
         conn.set_ex(cache_key, result_str, 120).unwrap_or(());
