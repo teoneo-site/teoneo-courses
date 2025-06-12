@@ -188,7 +188,7 @@ pub async fn fetch_course(state: &AppState, id: i32) -> anyhow::Result<BasicCour
         }
     }
 
-    let course = sqlx::query_as::<_, BasicCourseInfo>("SELECT title, brief_description, full_description, tags, picture_url, price FROM courses WHERE id = ?")
+    let course = sqlx::query_as::<_, BasicCourseInfo>("SELECT id, title, brief_description, full_description, tags, picture_url, price FROM courses WHERE id = ?")
         .bind(id)
         .fetch_one(&state.pool)
         .await?;
