@@ -43,7 +43,7 @@ pub async fn get_all_courses(State(state): State<AppState>) -> Result<Response, 
 // PUBLIC GET /courses - Get a list of all available courses (for main page)
 pub async fn get_courses_by_ids(State(state): State<AppState>, headers: HeaderMap, Query(ids): Query<IdsStruct>) -> Result<Response, Response> {
     let authorization_token = 
-        headers
+       headers
         .get("Authorization")
         .and_then(|value| value.to_str().ok())
         .and_then(|s| s.split_whitespace().last())
@@ -97,36 +97,70 @@ pub async fn get_courses_by_ids(State(state): State<AppState>, headers: HeaderMa
             };
         }
     }
-
-    
 }
 
 // PUBLIC GET /course/{course_id} - Get info about a single course
 pub async fn get_course(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Path(course_id): Path<i32>,
 ) -> Result<Response, Response> {
-    match controllers::course::get_course(&state, course_id).await {
-        Ok(course) => {
-            let body = json!({
-                "data": course,
-            });
+    let authorization_token = 
+       headers
+        .get("Authorization")
+        .and_then(|value| value.to_str().ok())
+        .and_then(|s| s.split_whitespace().last())
+        .unwrap_or("");
 
-            return Ok((StatusCode::OK, axum::Json(body)).into_response());
-        }
-        Err(why) => {
-            eprintln!("Why co: {}", why);
+    match common::token::verify_jwt_token(authorization_token) {
+        Ok(user_id) => {
+            match controllers::course::get_course_extended(&state, course_id, user_id).await {
+                Ok(course) => {
+                    let body = json!({
+                        "data": course,
+                    });
 
-            return Err((
-                StatusCode::INTERNAL_SERVER_ERROR,
-                axum::Json(handlers::ErrorResponse::new(
-                    ErrorTypes::InternalError,
-                    "Could not fetch the course",
-                )),
-            )
-                .into_response());
+                    return Ok((StatusCode::OK, axum::Json(body)).into_response());
+                }
+                Err(why) => {
+                    eprintln!("Why co: {}", why);
+
+                    return Err((
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        axum::Json(handlers::ErrorResponse::new(
+                            ErrorTypes::InternalError,
+                            "Could not fetch the course",
+                        )),
+                    )
+                        .into_response());
+                }
+            };
         }
-    };
+        Err(_) => {
+            match controllers::course::get_course_basic(&state, course_id).await {
+                Ok(course) => {
+                    let body = json!({
+                        "data": course,
+                    });
+
+                    return Ok((StatusCode::OK, axum::Json(body)).into_response());
+                }
+                Err(why) => {
+                    eprintln!("Why co: {}", why);
+
+                    return Err((
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        axum::Json(handlers::ErrorResponse::new(
+                            ErrorTypes::InternalError,
+                            "Could not fetch the course",
+                        )),
+                    )
+                        .into_response());
+                }
+            };
+        }
+    }
+    
 }
 
 pub async fn get_course_progress(State(state): State<AppState>, Path(course_id): Path<i32>, claims: Claims) -> Result<Response, Response> {

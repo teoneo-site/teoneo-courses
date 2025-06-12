@@ -7,13 +7,9 @@ use super::course::ShortCourseInfo;
 pub struct UserInfoFull {
     pub username: String,
     pub email: String,
-    pub courses: Vec<ShortCourseInfo>,
+    pub courses: Vec<i32>,
 }
 
-#[derive(Default, Serialize, Deserialize)]
-pub struct CoursesInfo {
-    pub courses: Vec<ShortCourseInfo>
-}
 
 #[derive(Default, Serialize, Deserialize)]
 pub struct UserInfo {
@@ -32,8 +28,8 @@ pub async fn get_user_info_all(app_state: &AppState, user_id: u32) -> anyhow::Re
     let info = db::userdb::get_user_info_all(app_state, user_id).await?;
     Ok(info)
 }
-pub async fn get_courses_info(app_state: &AppState, user_id: u32) -> anyhow::Result<CoursesInfo> {
-    let info = db::userdb::get_course_info(app_state, user_id).await?;
+pub async fn get_courses_info(app_state: &AppState, user_id: u32) -> anyhow::Result<Vec<i32>> {
+    let info = db::userdb::get_courses_info(app_state, user_id).await?;
     Ok(info)
 }
 pub async fn get_user_info(app_state: &AppState, user_id: u32) -> anyhow::Result<UserInfo> {

@@ -1,6 +1,6 @@
 use redis::Commands;
 use sqlx::Row;
-use crate::controllers::course::{BasicCourseInfo, CourseProgress, ExpandedCourseInfo};
+use crate::controllers::course::{BasicCourseInfo, CourseProgress, ExtendedCourseInfo};
 use crate::AppState;
 
 impl<'r> sqlx::FromRow<'r, sqlx::mysql::MySqlRow> for BasicCourseInfo {
@@ -17,7 +17,7 @@ impl<'r> sqlx::FromRow<'r, sqlx::mysql::MySqlRow> for BasicCourseInfo {
         })
     }
 }
-impl<'r> sqlx::FromRow<'r, sqlx::mysql::MySqlRow> for ExpandedCourseInfo {
+impl<'r> sqlx::FromRow<'r, sqlx::mysql::MySqlRow> for ExtendedCourseInfo {
     fn from_row(row: &'r sqlx::mysql::MySqlRow) -> Result<Self, sqlx::Error> {
         let has_course: bool = row.try_get("has_course")?;
         let tasks_passed: Option<i32> = if has_course { row.try_get("tasks_passed")? } else { None };
@@ -83,16 +83,16 @@ pub async fn fetch_courses_by_ids_basic(state: &AppState, ids: Vec<i32>) -> anyh
     Ok(courses)
 }
 
-pub async fn fetch_courses_by_ids_expanded(state: &AppState, ids: Vec<i32>, user_id: u32) -> anyhow::Result<Vec<ExpandedCourseInfo>> {
+pub async fn fetch_courses_by_ids_expanded(state: &AppState, ids: Vec<i32>, user_id: u32) -> anyhow::Result<Vec<ExtendedCourseInfo>> {
     
-    let mut courses: Vec<ExpandedCourseInfo> = Vec::new();
+    let mut courses: Vec<ExtendedCourseInfo> = Vec::new();
     let mut ids_to_fetch = Vec::new();
 
 
     if let Ok(mut conn) = state.redis.get() {
         for id in &ids {
             if let Ok(val) = conn.get::<String, String>(format!("exp-course:{}:user:{}", id, user_id)) {
-                if let Ok(parsed_course) = serde_json::from_str::<ExpandedCourseInfo>(&val) {
+                if let Ok(parsed_course) = serde_json::from_str::<ExtendedCourseInfo>(&val) {
                     courses.push(parsed_course);
                     continue;
                 }
@@ -137,7 +137,7 @@ pub async fn fetch_courses_by_ids_expanded(state: &AppState, ids: Vec<i32>, user
             placeholders.join(", ")
         );
 
-        let mut query_builder = sqlx::query_as::<_, ExpandedCourseInfo>(&query)
+        let mut query_builder = sqlx::query_as::<_, ExtendedCourseInfo>(&query)
             .bind(user_id)
             .bind(user_id);
 
@@ -158,28 +158,83 @@ pub async fn fetch_courses_by_ids_expanded(state: &AppState, ids: Vec<i32>, user
     Ok(courses)
 }
 
-pub async fn fetch_all_courses(state: &AppState) -> anyhow::Result<Vec<BasicCourseInfo>> {
+pub async fn fetch_all_courses(state: &AppState) -> anyhow::Result<Vec<i32>> {
     if let Ok(mut conn) = state.redis.get() { 
         if let Ok(val) = conn.get::<&str, String>("courses:all") { // If courses are cached
-            if let Ok(parsed_vec) = serde_json::from_str::<Vec<BasicCourseInfo>>(&val) { // Get them from redis
+            if let Ok(parsed_vec) = serde_json::from_str::<Vec<i32>>(&val) { // Get them from redis
                 println!("Cachedcourses");
                 return Ok(parsed_vec)
             }
         }
     }
-    let courses = sqlx::query_as::<_, BasicCourseInfo>("SELECT id, title, brief_description, full_description, tags, picture_url, price FROM courses") // Todo: Pagination with LIMIT
+    let courses_ids: Vec<i32> = sqlx::query("SELECT id FROM courses") // Todo: Pagination with LIMIT
         .fetch_all(&state.pool)
-        .await?;
-
+        .await?
+        .into_iter()
+        .map(|row| row.try_get("id").unwrap())
+        .collect();
+        
     // If courses aren't cached -> cache them for an hour
     if let Ok(mut conn) = state.redis.get() { 
-        let result_str = serde_json::to_string(&courses).unwrap();  // Isn't supposed to fail
+        let result_str = serde_json::to_string(&courses_ids).unwrap();  // Isn't supposed to fail
         conn.set_ex("courses:all", result_str, 3600).unwrap_or(()); // Ignore error, because we dont really care, can't afford to break when cant set smth
     }
-    Ok(courses)
+    Ok(courses_ids)
 }
 
-pub async fn fetch_course(state: &AppState, id: i32) -> anyhow::Result<BasicCourseInfo> {
+pub async fn fetch_course_extended(state: &AppState, id: i32, user_id: u32) -> anyhow::Result<ExtendedCourseInfo> {
+    if let Ok(mut conn) = state.redis.get() { 
+        if let Ok(val) = conn.get::<String, String>(format!("course:{}", id)) {
+            if let Ok(parsed_course) = serde_json::from_str::<ExtendedCourseInfo>(&val) {
+                return Ok(parsed_course)
+            }
+        }
+    }
+
+    let query = 
+        "SELECT 
+            c.id,
+            c.title,
+            c.brief_description,
+            c.full_description,
+            c.tags,
+            c.picture_url,
+            c.price,
+            EXISTS (
+                SELECT 1 FROM user_courses uc 
+                WHERE uc.user_id = ? AND uc.course_id = c.id
+            ) AS has_course,
+            (
+                SELECT COUNT(*) 
+                FROM tasks t
+                JOIN modules m ON t.module_id = m.id
+                WHERE m.course_id = c.id
+            ) AS tasks_total,
+            (
+                SELECT COUNT(*) 
+                FROM task_progress tp
+                JOIN tasks t ON tp.task_id = t.id
+                JOIN modules m ON t.module_id = m.id
+                WHERE tp.user_id = ? AND tp.status = 'SUCCESS' AND m.course_id = c.id
+            ) AS tasks_passed
+        FROM courses c
+        WHERE c.id = ?";
+    let course = sqlx::query_as::<_, ExtendedCourseInfo>(query)
+        .bind(user_id)
+        .bind(user_id)
+        .bind(id)
+        .fetch_one(&state.pool)
+        .await?;
+    
+    if let Ok(mut conn) = state.redis.get() { 
+        let course_str = serde_json::to_string(&course).unwrap(); // Isn't supposed to fail
+        conn.set_ex(format!("course:{}", id), course_str, 3600).unwrap_or(());
+    }
+
+    Ok(course)
+}
+
+pub async fn fetch_course_basic(state: &AppState, id: i32) -> anyhow::Result<BasicCourseInfo> {
     if let Ok(mut conn) = state.redis.get() { 
         if let Ok(val) = conn.get::<String, String>(format!("course:{}", id)) {
             if let Ok(parsed_course) = serde_json::from_str::<BasicCourseInfo>(&val) {

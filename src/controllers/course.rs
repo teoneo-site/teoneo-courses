@@ -36,7 +36,7 @@ impl BasicCourseInfo {
 
 
 #[derive(Serialize, Deserialize, Clone)]
-pub struct ExpandedCourseInfo {
+pub struct ExtendedCourseInfo {
     pub id: i32,
     pub title: String,
     pub brief_description: String,
@@ -48,7 +48,7 @@ pub struct ExpandedCourseInfo {
     pub tasks_passed: Option<i32>,
     pub tasks_total: Option<i32>,
 }
-impl ExpandedCourseInfo {
+impl ExtendedCourseInfo {
     pub fn new(
         id: i32,
         title: String,
@@ -110,7 +110,7 @@ pub struct CourseProgress {
 // Currently, there is really no need for this method in the controller,
 // you can just call fetch from the handler,
 // BUT maybe we'll need this in future for some settings kinda stuff
-pub async fn get_all_courses(pool: &AppState) -> anyhow::Result<Vec<BasicCourseInfo>> {
+pub async fn get_all_courses(pool: &AppState) -> anyhow::Result<Vec<i32>> {
     let courses = db::coursedb::fetch_all_courses(pool).await?;
     Ok(courses)
 }
@@ -123,7 +123,7 @@ pub async fn get_favourite_courses(pool: &AppState, user_id: u32) -> anyhow::Res
     Ok(ids)
 }
 
-pub async fn get_courses_by_ids_expanded(pool: &AppState, ids: Vec<i32>, user_id: u32) -> anyhow::Result<Vec<ExpandedCourseInfo>> {
+pub async fn get_courses_by_ids_expanded(pool: &AppState, ids: Vec<i32>, user_id: u32) -> anyhow::Result<Vec<ExtendedCourseInfo>> {
     let courses = db::coursedb::fetch_courses_by_ids_expanded(pool, ids, user_id).await?;
     Ok(courses)
 }
@@ -141,8 +141,12 @@ pub async fn get_course_progress(pool: &AppState, course_id: i32, user_id: u32) 
 // Currently, there is really no need for this method in the controller,
 // you can just call fetch from the handler,
 // BUT maybe we'll need this in future for some settings kinda stuff
-pub async fn get_course(state: &AppState, id: i32) -> anyhow::Result<BasicCourseInfo> {
-    let course = db::coursedb::fetch_course(state, id).await?;
+pub async fn get_course_extended(state: &AppState, id: i32, user_id: u32) -> anyhow::Result<ExtendedCourseInfo> {
+    let course = db::coursedb::fetch_course_extended(state, id, user_id).await?;
+    Ok(course)
+}
+pub async fn get_course_basic(state: &AppState, id: i32) -> anyhow::Result<BasicCourseInfo> {
+    let course = db::coursedb::fetch_course_basic(state, id).await?;
     Ok(course)
 }
 

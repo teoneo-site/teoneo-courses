@@ -3,8 +3,6 @@ use redis::Commands;
 use sqlx::Row;
 
 use crate::controllers;
-use crate::controllers::course::ShortCourseInfo;
-use crate::controllers::user::CoursesInfo;
 use crate::controllers::user::UserInfo;
 use crate::controllers::user::UserInfoFull;
 use crate::AppState;
@@ -55,22 +53,6 @@ pub async fn get_user_info_all(state: &AppState, user_id: u32) -> anyhow::Result
         u.username, 
         u.email, 
         c.id AS course_id, 
-        c.title, 
-        c.picture_url,
-        c.brief_description,
-        (
-            SELECT COUNT(*)
-            FROM modules m
-            JOIN tasks t ON t.module_id = m.id
-            WHERE m.course_id = c.id
-        ) AS tasks_total,
-        (
-            SELECT COUNT(*)
-            FROM modules m
-            JOIN tasks t ON t.module_id = m.id
-            JOIN task_progress tp ON tp.task_id = t.id
-            WHERE m.course_id = c.id AND tp.user_id = u.id AND tp.status = 'SUCCESS'
-        ) AS tasks_passed
     FROM users u
     LEFT JOIN user_courses p ON p.user_id = u.id
     LEFT JOIN courses c ON p.course_id = c.id
@@ -94,17 +76,9 @@ pub async fn get_user_info_all(state: &AppState, user_id: u32) -> anyhow::Result
 
     for row in rows.into_iter() {
         let course_id: Option<i32> = row.try_get("course_id")?;
-        let title: Option<String> = row.try_get("title")?;
-        let brief_description: Option<String> = row.try_get("brief_description")?;
-        let picture_url: Option<String> = row.try_get("picture_url")?;
-        let tasks_passed: Option<i32> = row.try_get("tasks_passed")?;
-        let tasks_total: Option<i32> = row.try_get("tasks_total")?;
-
-        if let (Some(course_id), Some(title), Some(brief_description), Some(picture_url), Some(tasks_passed), Some(tasks_total)) =
-            (course_id, title, brief_description, picture_url, tasks_passed, tasks_total)
-        {
-            courses.push(ShortCourseInfo::new(course_id, title, brief_description, picture_url, tasks_passed, tasks_total));
-        }
+        if let Some(course_id) = course_id {
+            courses.push(course_id);
+        } 
     }
     userinfo.courses = courses;
 
@@ -117,11 +91,11 @@ pub async fn get_user_info_all(state: &AppState, user_id: u32) -> anyhow::Result
 }
 
 
-pub async fn get_course_info(state: &AppState, user_id: u32) -> anyhow::Result<CoursesInfo> {
+pub async fn get_courses_info(state: &AppState, user_id: u32) -> anyhow::Result<Vec<i32>> {
     let cache_key = format!("user:info:courses:{}", user_id);
     if let Ok(mut conn) = state.redis.get() { 
         if let Ok(val) = conn.get::<&str, String>(&cache_key) {
-            if let Ok(courses_info_struct) = serde_json::from_str::<CoursesInfo>(&val) {
+            if let Ok(courses_info_struct) = serde_json::from_str::<Vec<i32>>(&val) {
                 return Ok(courses_info_struct)
             }
         }
@@ -129,22 +103,6 @@ pub async fn get_course_info(state: &AppState, user_id: u32) -> anyhow::Result<C
 
     let query = "SELECT 
         c.id AS course_id, 
-        c.title, 
-        c.brief_description,
-        c.picture_url,
-        (
-            SELECT COUNT(*)
-            FROM modules m
-            JOIN tasks t ON t.module_id = m.id
-            WHERE m.course_id = c.id
-        ) AS tasks_total,
-        (
-            SELECT COUNT(*)
-            FROM modules m
-            JOIN tasks t ON t.module_id = m.id
-            JOIN task_progress tp ON tp.task_id = t.id
-            WHERE m.course_id = c.id AND tp.user_id = u.id AND tp.status = 'SUCCESS'
-        ) AS tasks_passed
     FROM users u
     LEFT JOIN user_courses p ON p.user_id = u.id
     LEFT JOIN courses c ON p.course_id = c.id
@@ -154,33 +112,19 @@ pub async fn get_course_info(state: &AppState, user_id: u32) -> anyhow::Result<C
         .fetch_all(&state.pool)
         .await?;
 
-    if rows.is_empty() {
-        return Err(anyhow!("User does not exist"))
-    }
-    let mut coursesinfo = CoursesInfo::default();
-    
     let mut courses = vec![];
     for row in rows.into_iter() {
         let course_id: Option<i32> = row.try_get("course_id")?;
-        let title: Option<String> = row.try_get("title")?;
-        let brief_description: Option<String> = row.try_get("brief_description")?;
-        let picture_url: Option<String> = row.try_get("picture_url")?;
-        let tasks_passed: Option<i32> = row.try_get("tasks_passed")?;
-        let tasks_total: Option<i32> = row.try_get("tasks_total")?;
-
-        if let (Some(course_id), Some(title), Some(brief_description), Some(picture_url), Some(tasks_passed), Some(tasks_total)) =
-            (course_id, title, brief_description, picture_url, tasks_passed, tasks_total)
-        {
-            courses.push(ShortCourseInfo::new(course_id, title, brief_description, picture_url, tasks_passed, tasks_total));
-        }
+        if let Some(course_id) = course_id {
+            courses.push(course_id);
+        } 
     }
-    coursesinfo.courses = courses;
         
     if let Ok(mut conn) = state.redis.get() { 
-        let result_str = serde_json::to_string(&coursesinfo).unwrap();
+        let result_str = serde_json::to_string(&courses).unwrap();
         conn.set_ex(cache_key, result_str, 120).unwrap_or(());
     }
-    Ok(coursesinfo)
+    Ok(courses)
 }
 
 pub async fn get_user_stats(state: &AppState, user_id: u32) -> anyhow::Result<controllers::user::UserStats> {
