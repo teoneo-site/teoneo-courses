@@ -1,30 +1,52 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{db, AppState};
-
 #[derive(Serialize, Deserialize)]
 pub struct BasicCourseInfo {
     pub id: i32,
-    title: String,
-    brief_description: String,
-    full_description: String,
-    tags: Vec<String>,
-    picture_url: String,
-    price: f64,
+    pub title: String,
+    pub brief_description: String,
+    pub full_description: String,
+    pub tags: Vec<String>,
+    pub picture_url: String,
+    pub price: f64,
 }
+
+impl BasicCourseInfo {
+    pub fn new(
+        id: i32,
+        title: String,
+        brief_description: String,
+        full_description: String,
+        tags: Vec<String>,
+        picture_url: String,
+        price: f64
+    ) -> Self {
+        Self {
+            id,
+            title,
+            brief_description,
+            full_description,
+            tags,
+            picture_url,
+            price,
+        }
+    }
+}
+
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ExpandedCourseInfo {
     pub id: i32,
-    title: String,
-    brief_description: String,
-    full_description: String,
-    tags: Vec<String>,
-    picture_url: String,
-    price: f64,
-    has_course: bool,
-    tasks_passed: Option<i32>,
-    tasks_total: Option<i32>,
+    pub title: String,
+    pub brief_description: String,
+    pub full_description: String,
+    pub tags: Vec<String>,
+    pub picture_url: String,
+    pub price: f64,
+    pub has_course: bool,
+    pub tasks_passed: Option<i32>,
+    pub tasks_total: Option<i32>,
 }
 impl ExpandedCourseInfo {
     pub fn new(
@@ -76,7 +98,7 @@ impl ShortCourseInfo {
     }
 }
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize, Default, sqlx::FromRow)]
 pub struct CourseProgress {
     pub course_id: i32,
     pub tasks_passed: i32,
@@ -84,28 +106,6 @@ pub struct CourseProgress {
 }
 
 
-
-impl BasicCourseInfo {
-    pub fn new(
-        id: i32,
-        title: String,
-        brief_description: String,
-        full_description: String,
-        tags: Vec<String>,
-        picture_url: String,
-        price: f64
-    ) -> Self {
-        Self {
-            id,
-            title,
-            brief_description,
-            full_description,
-            tags,
-            picture_url,
-            price,
-        }
-    }
-}
 
 // Currently, there is really no need for this method in the controller,
 // you can just call fetch from the handler,

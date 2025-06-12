@@ -69,13 +69,13 @@ impl From<String> for TaskType {
 
 #[derive(Serialize, Deserialize)]
 pub struct TaskShortInfo {
-    id: i32,
-    module_id: i32,
-    title: String,
+    pub id: i32,
+    pub module_id: i32,
+    pub title: String,
     #[serde(rename = "type")]
-    task_type: TaskType,
+    pub task_type: TaskType,
     #[serde(skip_serializing_if = "Option::is_none")]
-    status: Option<ProgressStatus>,
+    pub status: Option<ProgressStatus>,
 }
 
 impl TaskShortInfo {

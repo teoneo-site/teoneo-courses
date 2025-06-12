@@ -41,14 +41,14 @@ impl From<String> for ProgressStatus {
 
 #[derive(Serialize, Deserialize)]
 pub struct Progress {
-    id: u32,
-    user_id: u32,
-    task_id: i32,
-    status: ProgressStatus,
-    submission: serde_json::Value,
-    score: f32,
-    attempts: i32,
-    updated_at: DateTime<Utc>,
+    pub id: u32,
+    pub user_id: u32,
+    pub task_id: i32,
+    pub status: ProgressStatus,
+    pub submission: serde_json::Value,
+    pub score: f32,
+    pub attempts: i32,
+    pub updated_at: DateTime<Utc>,
 }
 
 impl Progress {

@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{db, AppState};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, sqlx::FromRow)]
 pub struct ModuleInfo {
     pub id: i32,
     pub course_id: i32,

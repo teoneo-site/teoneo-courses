@@ -8,6 +8,23 @@ use crate::controllers::progress::Progress;
 use crate::controllers::progress::ProgressStatus;
 use crate::AppState;
 
+
+impl<'r> sqlx::FromRow<'r, sqlx::mysql::MySqlRow> for Progress {
+    fn from_row(row: &'r sqlx::mysql::MySqlRow) -> Result<Self, sqlx::Error> {
+        Ok(Self {
+            id: row.try_get("id")?,
+            user_id: row.try_get("user_id")?,
+            task_id: row.try_get("task_id")?,
+            status: row.try_get::<String, _>("status")?.into(),
+            submission: row.try_get("submission")?,
+            score: row.try_get("score")?,
+            attempts: row.try_get("attempts")?,
+            updated_at: row.try_get("updated_at")?,
+        })
+    }
+}
+
+
 pub async fn update_or_insert(
     state: &AppState,
     user_id: u32,
@@ -54,27 +71,15 @@ pub async fn fetch_task_progress(
             }
         }
     }
-
     // Если не найдено — берём из базы
-    let row = sqlx::query(
-        "SELECT id, status, submission, score, attempts, updated_at FROM task_progress
+    let progress = sqlx::query_as::<_, Progress>(
+        "SELECT id, user_id, task_id, status, submission, score, attempts, updated_at FROM task_progress
          WHERE user_id = ? AND task_id = ?"
     )
     .bind(user_id)
     .bind(task_id)
     .fetch_one(&state.pool)
     .await?;
-
-    let id: u32 = row.try_get("id")?;
-    let status: ProgressStatus = row.try_get::<String, _>("status")?.into();
-    let submission: serde_json::Value = row.try_get("submission")?;
-    let score: f32 = row.try_get("score")?;
-    let attempts: i32 = row.try_get("attempts")?;
-    let updated_at: DateTime<Utc> = row.try_get("updated_at")?;
-
-    let progress = Progress::new(
-        id, user_id, task_id, status, submission, score, attempts, updated_at,
-    );
 
     if let Ok(mut conn) = state.redis.get() { 
         let _: () = conn
@@ -91,12 +96,9 @@ pub async fn get_prompt_task_attemps(
     user_id: u32,
     task_id: i32,
 ) -> anyhow::Result<(i32, i32)> {
-    let row = sqlx::query("SELECT t.attempts, p.max_attempts FROM task_progress t LEFT JOIN prompts p ON t.task_id = p.task_id WHERE t.user_id = ? AND t.task_id = ?")
+    let attempts = sqlx::query_as::<_, (i32, i32)>("SELECT t.attempts, p.max_attempts FROM task_progress t LEFT JOIN prompts p ON t.task_id = p.task_id WHERE t.user_id = ? AND t.task_id = ?")
         .bind(user_id)
         .bind(task_id)
         .fetch_one(pool).await?;
-
-    let attempts: i32 = row.try_get(0)?;
-    let max_attempts: i32 = row.try_get(1)?;
-    Ok((attempts, max_attempts))
+    Ok((attempts.0, attempts.1))
 }
