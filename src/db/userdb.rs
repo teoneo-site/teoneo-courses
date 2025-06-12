@@ -52,7 +52,7 @@ pub async fn get_user_info_all(state: &AppState, user_id: u32) -> anyhow::Result
     let query = "SELECT 
         u.username, 
         u.email, 
-        c.id AS course_id, 
+        c.id AS course_id
     FROM users u
     LEFT JOIN user_courses p ON p.user_id = u.id
     LEFT JOIN courses c ON p.course_id = c.id
@@ -102,7 +102,7 @@ pub async fn get_courses_info(state: &AppState, user_id: u32) -> anyhow::Result<
     }
 
     let query = "SELECT 
-        c.id AS course_id, 
+        c.id AS course_id
     FROM users u
     LEFT JOIN user_courses p ON p.user_id = u.id
     LEFT JOIN courses c ON p.course_id = c.id
