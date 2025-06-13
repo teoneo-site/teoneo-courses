@@ -11,7 +11,7 @@ pub const PROMPT_TEMPLATE: &'static str = r#"
 
 {question}
 
-Вот промпт, написанный пользователем:
+Вот промпт, написанный пользователем (ТЫ ДОЛЖЕН ОЦЕНИВАТЬ ЕГО):
 {user_prompt}
 
 (Дополнительный контекст, который следует учитывать при оценке промпта:
@@ -25,11 +25,11 @@ pub const PROMPT_TEMPLATE: &'static str = r#"
 5. Насколько он эффективен с точки зрения получения правильного ответа от ИИ.
 
 Верни ответ в формате JSON без лишних символов, т.е без `:
-{{
+{
   "score": <число от 0.0 до 1.0, где 0 - 0%, 1.0 - 100%>,
   "reply": <ответ на промпт пользователя, ты должен выполнить его задание, он не сильно распространенный, довольно краткий, но не сильно>,
   "feedback": "<краткий текстовый отзыв>"
-}}
+}
 "#;
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
@@ -253,7 +253,15 @@ pub async fn process_prompt_task(
             );
 
         let reply = state.ai.send_message(message.into()).await.unwrap(); // Should not panic under normal circumstances, only if gigachat is down, then it returns 500 Server internal error
-        let reply_struct: PromptReply = serde_json::from_str(&reply.content).unwrap(); // Panics on rate limit by gigachat, but 500 for this kind of situation is ok I guess?
+        println!("GIGACHAT REPLY: {}", reply.content);
+
+        let reply_struct: PromptReply = match serde_json::from_str(&reply.content) {
+            Ok(parsed) => parsed,
+            Err(err) => {
+                eprintln!("Could not parse gigachat reply: {}", err);
+                return;
+            }
+        };
 
         let mut json_submission: serde_json::Value =
             serde_json::Value::Object(serde_json::Map::new());
