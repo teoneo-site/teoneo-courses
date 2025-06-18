@@ -10,6 +10,7 @@ use crate::{
     common::{self, token::Claims}, controllers, db, handlers::{self, ErrorTypes}, AppState
 };
 
+
 #[derive(Deserialize)]
 pub struct IdsStruct {
     ids: Vec<i32>,
@@ -26,13 +27,13 @@ pub async fn get_all_courses(State(state): State<AppState>) -> Result<Response, 
             return Ok((StatusCode::OK, axum::Json(body)).into_response());
         }
         Err(why) => {
-            eprintln!("Why co: {}", why);
+            tracing::error!("Could not fetch all courses: {}", why);
             
             return Err((
                 StatusCode::INTERNAL_SERVER_ERROR,
                 axum::Json(handlers::ErrorResponse::new(
                     ErrorTypes::InternalError,
-                    "Could not fetch courses",
+                    "Could not fetch courses, because it is (probably) empty",
                 )),
             )
                 .into_response());
@@ -60,13 +61,13 @@ pub async fn get_courses_by_ids(State(state): State<AppState>, headers: HeaderMa
                     return Ok((StatusCode::OK, axum::Json(body)).into_response());
                 }
                 Err(why) => {
-                    eprintln!("Why co: {}", why);
+                    tracing::error!("Could not get courses by ids extended: {}", why);
                     
                     return Err((
                         StatusCode::INTERNAL_SERVER_ERROR,
                         axum::Json(handlers::ErrorResponse::new(
                             ErrorTypes::InternalError,
-                            "Could not fetch courses",
+                            &format!("Could not fetch courses, because: {}", why),
                         )),
                     )
                         .into_response());
@@ -83,13 +84,13 @@ pub async fn get_courses_by_ids(State(state): State<AppState>, headers: HeaderMa
                     return Ok((StatusCode::OK, axum::Json(body)).into_response());
                 }
                 Err(why) => {
-                    eprintln!("Why co: {}", why);
+                    tracing::error!("Could not get courses by ids basic: {}", why);
                     
                     return Err((
                         StatusCode::INTERNAL_SERVER_ERROR,
                         axum::Json(handlers::ErrorResponse::new(
                             ErrorTypes::InternalError,
-                            "Could not fetch courses",
+                            &format!("Could not fetch courses, What's up with the database?: {}", why),
                         )),
                     )
                         .into_response());
@@ -123,13 +124,13 @@ pub async fn get_course(
                     return Ok((StatusCode::OK, axum::Json(body)).into_response());
                 }
                 Err(why) => {
-                    eprintln!("Why co: {}", why);
+                    tracing::error!("Could not get course extended info: {}", why);
 
                     return Err((
                         StatusCode::INTERNAL_SERVER_ERROR,
                         axum::Json(handlers::ErrorResponse::new(
                             ErrorTypes::InternalError,
-                            "Could not fetch the course",
+                            &format!("Could not fetch the course, because: {}", why),
                         )),
                     )
                         .into_response());
@@ -146,13 +147,13 @@ pub async fn get_course(
                     return Ok((StatusCode::OK, axum::Json(body)).into_response());
                 }
                 Err(why) => {
-                    eprintln!("Why co: {}", why);
+                    tracing::error!("Could not get course basicinfo: {}", why);
 
                     return Err((
                         StatusCode::INTERNAL_SERVER_ERROR,
                         axum::Json(handlers::ErrorResponse::new(
                             ErrorTypes::InternalError,
-                            "Could not fetch the course",
+                           &format!("Could not fetch the course, because: {}", why),
                         )),
                     )
                         .into_response());
@@ -173,12 +174,12 @@ pub async fn get_course_progress(State(state): State<AppState>, Path(course_id):
             return Ok((StatusCode::OK, axum::Json(body)).into_response())
         }
         Err(why) => {
-            eprintln!("Why co: {}", why);
+            tracing::error!("Why could not fetch course progress: {}", why);
             return Err((
                 StatusCode::INTERNAL_SERVER_ERROR,
                 axum::Json(handlers::ErrorResponse::new(
                     ErrorTypes::InternalError,
-                    "Could not fetch the course",
+                    &format!("Could not fetch the course, because: {}", why),
                 )),
             )
                 .into_response());
@@ -194,7 +195,7 @@ pub async fn add_course_to_favourite(State(state): State<AppState>, Path(course_
             return Ok((StatusCode::OK).into_response())
         }
         Err(why) => {
-            eprintln!("Could not favour a course: {}", why);
+            tracing::error!("Could not favour a course: {}", why);
             return Err((
                 StatusCode::INTERNAL_SERVER_ERROR,
                 axum::Json(handlers::ErrorResponse::new(
@@ -217,7 +218,7 @@ pub async fn get_favourite_courses(State(state): State<AppState>, claims: Claims
             return Ok((StatusCode::OK, axum::Json(body)).into_response())
         }
         Err(why) => {
-            eprintln!("Could not get favourite courses: {}", why);
+            tracing::error!("Could not get favourite courses: {}", why);
             return Err((
                 StatusCode::INTERNAL_SERVER_ERROR,
                 axum::Json(handlers::ErrorResponse::new(

@@ -36,12 +36,12 @@ pub async fn get_modules_for_course(
             return Ok((StatusCode::OK, axum::Json(json)).into_response());
         }
         Err(why) => {
-            eprintln!("Why mo: {}", why);
+            tracing::error!("Could not fetch modules for course: {}", why);
             return Err((
                 StatusCode::INTERNAL_SERVER_ERROR,
                 axum::Json(handlers::ErrorResponse::new(
                     ErrorTypes::InternalError,
-                    "Could not fetch modules",
+                &format!("Could not fetch modules, because: {}", why),
                 )),
             )
                 .into_response());
@@ -64,7 +64,7 @@ pub async fn get_module(
         match controllers::course::verify_ownership(&state, user_id as i32, course_id).await {
             Ok(_) => true,
             Err(why) => {
-                eprintln!("verify_ownership failed: {}", why);
+                tracing::error!("verify_ownership failed: {}", why);
                 false
             }
         }
@@ -95,12 +95,12 @@ pub async fn get_module(
             return Ok((StatusCode::OK, axum::Json(body)).into_response());
         }
         Err(why) => {
-            eprintln!("Why mo cock: {}", why);
+            tracing::error!("Could not get module: {}", why);
             return Err((
                 StatusCode::INTERNAL_SERVER_ERROR,
                 axum::Json(handlers::ErrorResponse::new(
                     ErrorTypes::InternalError,
-                    "Could not fetch the module",
+                    &format!("Could not fetch the module: {}", why),
                 )), // Should not panic, because struct is always valid for converting into JSON
             )
                 .into_response());

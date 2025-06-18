@@ -1,17 +1,3 @@
-
-/*
-JSON:
- data: { 
-    username
-    email
-    courses: {
-        id,
-        title, 
-        brief_description
-    }
-}
-*/
-
 use axum::{extract::{Query, State}, http::StatusCode, response::{IntoResponse, Response}};
 use serde::{Deserialize, Serialize};
 
@@ -38,12 +24,12 @@ async fn handle_result<T: Serialize>(fut: impl std::future::Future<Output = anyh
             return Ok((StatusCode::OK, axum::Json(json_obj)).into_response())
         }
         Err(why) => {
-            eprintln!("Why failed: {}", why);
+            eprintln!("Could not handle get user info result: {}", why);
             return Err((
                 StatusCode::INTERNAL_SERVER_ERROR,
                 axum::Json(handlers::ErrorResponse::new(
                     ErrorTypes::InternalError,
-                    "Something happened",
+                    &format!("Something happened: {}", why),
                 )), // Should not panic, because struct is always valid for converting into JSON
             )
                 .into_response());
@@ -82,7 +68,7 @@ pub async fn get_user_stats(State(state): State<AppState>, claims: Claims) -> Re
                 StatusCode::INTERNAL_SERVER_ERROR,
                 axum::Json(handlers::ErrorResponse::new(
                     ErrorTypes::InternalError,
-                    "Could not fetch user stats, probably user does not exist",
+                    &format!("Could not fetch user stats, probably user does not exist: {}", why),
                 )), // Should not panic, because struct is always valid for converting into JSON
             )
                 .into_response());

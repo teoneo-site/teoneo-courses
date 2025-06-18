@@ -37,7 +37,7 @@ pub async fn get_tasks_for_module(
 ) -> Result<Response, Response> {
     let user_id = claims.id as i32;
     if let Err(why) = controllers::course::verify_ownership(&state, claims.id as i32, course_id).await {
-        eprintln!("Could not verify course ownership {}", why);
+        tracing::error!("Could not verify course ownership {}", why);
         return Err((
             StatusCode::FORBIDDEN,
             axum::Json(ErrorResponse::new(
@@ -67,12 +67,12 @@ pub async fn get_tasks_for_module(
             return Ok((StatusCode::OK, axum::Json(body)).into_response());
         }
         Err(why) => {
-            eprintln!("Why failed: {}", why);
+            tracing::error!("Why failed: {}", why);
             return Err((
                 StatusCode::INTERNAL_SERVER_ERROR,
                 axum::Json(handlers::ErrorResponse::new(
                     ErrorTypes::InternalError,
-                    "Could not fetch tasks",
+                    &format!("Could not fetch tasks for module: {}", why),
                 )), // Should not panic, because struct is always valid for converting into JSON
             )
                 .into_response());
@@ -94,7 +94,7 @@ pub async fn get_task(
     let user_id = claims.id as i32;
     if let Err(why) =  controllers::course::verify_ownership(&state, claims.id as i32, course_id).await {
         // Does not own the course
-        eprintln!("Could not verify course ownership {}", why);
+        tracing::error!("Could not verify course ownership {}", why);
         return Err((
             StatusCode::FORBIDDEN,
             axum::Json(ErrorResponse::new(
@@ -124,12 +124,12 @@ pub async fn get_task(
             return Ok((StatusCode::OK, axum::Json(body)).into_response());
         }
         Err(why) => {
-            eprintln!("Why task fetch one: {}", why);
+            tracing::error!("Could not fetch one task: {}", why);
             return Err((
                 StatusCode::INTERNAL_SERVER_ERROR,
                 axum::Json(handlers::ErrorResponse::new(
                     ErrorTypes::InternalError,
-                    "Could not fetch the task",
+                    &format!("Could not fetch the task: {}", why),
                 )),
             )
                 .into_response());
@@ -152,7 +152,7 @@ pub async fn submit_task(
     let user_id = claims.id;
     if let Err(why) = controllers::course::verify_ownership(&state, user_id as i32, course_id).await {
         // Does not own the course
-        eprintln!("Could not verify course ownership {}", why);
+        tracing::error!("Could not verify course ownership {}", why);
         return Err((
             StatusCode::FORBIDDEN,
             axum::Json(ErrorResponse::new(
@@ -166,12 +166,12 @@ pub async fn submit_task(
     let task_type = match db::taskdb::fetch_task_type(&state.pool, task_id).await {
         Ok(task_type) => task_type,
         Err(why) => {
-            eprintln!("Why: {}", why);
+            tracing::error!("Could not getch task type: {}", why);
             return Err((
                 StatusCode::INTERNAL_SERVER_ERROR,
                 axum::Json(handlers::ErrorResponse::new(
                     ErrorTypes::InternalError,
-                    "Could not fetch the task type. Task doesnt exist",
+                    &format!("Could not fetch the task type. Task doesnt exist: {}", why),
                 )), // Should not panic, because struct is always valid for converting into JSON
             )
                 .into_response());
@@ -203,12 +203,12 @@ pub async fn submit_task(
             )
             .await
             {
-                eprintln!("Could not submit quiz|match task: {}", why);
+                tracing::error!("Could not submit quiz|match task: {}", why);
                 return Err((
                     StatusCode::INTERNAL_SERVER_ERROR,
                     axum::Json(handlers::ErrorResponse::new(
                         ErrorTypes::InternalError,
-                        "Error when submiting a quiz/match task",
+                        &format!("Error when submiting a quiz/match task: {}", why),
                     )),
                 )
                     .into_response());
@@ -233,12 +233,12 @@ pub async fn submit_task(
             }
 
             if let Err(why) = process_prompt_task(state, claims.id, task_id, user_answers).await {
-                eprintln!("Error submiting prompt task: {}", why);
+                tracing::error!("Error submiting prompt task: {}", why);
                 return Err((
                     StatusCode::INTERNAL_SERVER_ERROR,
                     axum::Json(handlers::ErrorResponse::new(
                         ErrorTypes::InternalError,
-                        "Error when submiting a prompt task",
+                        &format!("Error when submiting a prompt task: {}", why),
                     )),
                 )
                     .into_response());
@@ -270,7 +270,7 @@ pub async fn task_progress(
     let user_id = claims.id;
     if let Err(why) = controllers::course::verify_ownership(&state, claims.id as i32, course_id).await {
         // Does not own the course
-        eprintln!("Could not verify course ownership {}", why);
+        tracing::error!("Could not verify course ownership {}", why);
         return Err((
             StatusCode::FORBIDDEN,
             axum::Json(ErrorResponse::new(
@@ -289,12 +289,12 @@ pub async fn task_progress(
             return Ok((StatusCode::OK, axum::Json(body)).into_response());
         }
         Err(why) => {
-            eprintln!("Could not get progress (handler): {}", why);
+            tracing::error!("Could not get progress (handler): {}", why);
             return Err((
                 StatusCode::INTERNAL_SERVER_ERROR,
                 axum::Json(handlers::ErrorResponse::new(
                     ErrorTypes::InternalError,
-                    "Could not fetch the task progress",
+                    &format!("Could not fetch the task progress: {}", why),
                 )), // Should not panic, because struct is always valid for converting into JSON
             )
                 .into_response());

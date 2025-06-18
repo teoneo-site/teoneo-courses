@@ -153,7 +153,7 @@ fn get_router(app_state: AppState) -> Router {
 
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::fmt::init();
+    tracing_subscriber::fmt().pretty().init();
     dotenv::dotenv().ok();
 
     let app_state = AppState {
