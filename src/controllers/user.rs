@@ -1,9 +1,8 @@
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use crate::{db, AppState};
 
-use super::course::ShortCourseInfo;
-
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Default, Serialize, Deserialize, ToSchema)]
 pub struct UserInfoFull {
     pub username: String,
     pub email: String,
@@ -11,13 +10,13 @@ pub struct UserInfoFull {
 }
 
 
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Default, Serialize, Deserialize, ToSchema)]
 pub struct UserInfo {
     pub username: String,
     pub email: String
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, ToSchema)]
 pub struct UserStats {
     pub courses_owned: i64,
     pub courses_started: i64,

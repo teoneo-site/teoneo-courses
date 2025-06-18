@@ -14,11 +14,14 @@ use handlers::ErrorTypes;
 use sqlx::{mysql::MySqlPoolOptions, MySql, Pool};
 use tower::{buffer::BufferLayer, limit::RateLimitLayer, ServiceBuilder};
 use tower_http::{catch_panic::CatchPanicLayer, cors::CorsLayer};
+use utoipa::OpenApi;
+use utoipa_swagger_ui::SwaggerUi;
 
 mod common;
 mod controllers;
 mod db;
 mod handlers;
+mod swagger;
 
 #[derive(Clone)]
 struct AppState {
@@ -102,6 +105,10 @@ fn get_router(app_state: AppState) -> Router {
             axum::routing::get(handlers::modules::get_modules_for_course),
         )
         .route(
+            "/courses/{course_id}/modules/{module_id}",
+            axum::routing::get(handlers::modules::get_module),
+        )
+        .route(
             "/courses/{course_id}/favour",
             axum::routing::post(handlers::courses::add_course_to_favourite)
         )
@@ -109,10 +116,7 @@ fn get_router(app_state: AppState) -> Router {
             "/courses/favourite",
             axum::routing::get(handlers::courses::get_favourite_courses)
         )
-        .route(
-            "/courses/{course_id}/modules/{module_id}",
-            axum::routing::get(handlers::modules::get_module),
-        )
+        
         .route(
             "/courses/{course_id}/modules/{module_id}/tasks",
             axum::routing::get(handlers::tasks::get_tasks_for_module),
@@ -147,6 +151,7 @@ fn get_router(app_state: AppState) -> Router {
                 .layer(BufferLayer::new(1024)) // Means it can process 1024 messages before backpressure is applied TODO: Adjust
                 .layer(RateLimitLayer::new(10, Duration::from_secs(1))), // Rate limti does not impl Clone, so we need to use BufferLayer TODO: Adjust
         ) // Makes layers run in the background and messages are sent through the channels to them
+        .merge(SwaggerUi::new("/docs").url("/api-doc/openapi.json", swagger::ApiDoc::openapi()))
         .with_state(app_state);
     app
 }
@@ -166,21 +171,3 @@ async fn main() {
     let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await.unwrap();
     axum::serve(listener, router).await.unwrap();
 }
-
-/*
-version: "3.8"
-
-services:
-  teoneo-courses:
-    image: teoneo-courses
-    ports:
-      - "8080:8080"
-    environment:
-      # Добавь свои переменные окружения сюда
-      # Пример:
-      - SECRET_WORD_JWT=VLADIVOSTOK
-      - SECRET_WORD_REFRESH=VLADIVOSTOK2000
-      - GIGACHAT_TOKEN=MGMzNGI3YzYtODk1NC00MTk4LThhMDgtNzI4NDk1M2ViNzZkOmY5NjliOWE2LTk1MjMtNDk2NC04NDgyLTk0NzA1M2JkMmNlYw==
-      - DATABASE_URL=mysql://root:root@172.17.0.1:3306/teoneo
-      - REDIS_URL=redis://172.17.0.1:6379
- */

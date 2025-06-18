@@ -22,3 +22,6 @@ tower = { version = "0.5.2", features = ["limit", "buffer"] }
 redis = { version = "0.31.0", features = ["r2d2"] }
 r2d2 = "0.8.10"
 tracing = "0.1.41"
+utoipa = { version = "5.4.0", features = ["axum_extras", "chrono"] }
+utoipa-axum = "0.2.0"
+utoipa-swagger-ui = { version = "9.0.2", features = ["axum"] }

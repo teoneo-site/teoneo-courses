@@ -7,12 +7,24 @@ use serde_json::json;
 
 use crate::{
     common,
-    controllers,
-    handlers::{self, ErrorTypes},
+    controllers::{self, module::ModuleInfo},
+    handlers::{self, ErrorResponse, ErrorTypes},
     AppState,
 };
 
 // PUBLCI GET /course/{course_id}/modules - Get info course's modules (id, course_id, title)
+#[utoipa::path(
+    get,
+    description = "Возвращает инфу о модулях",
+    path = "/courses/{course_id}/modules",
+    params (
+        ("course_id" = String, Path, description = "Айди курса")
+    ),
+    responses(
+        (status = 200, description = "Успешно. Ответ без поля 'theory'", body = ModuleInfo),
+        (status = 500, description = "Не удалось зафетчить модули, что-то не так с БД", body = ErrorResponse)
+    )
+)]
 pub async fn get_modules_for_course(
     State(state): State<AppState>,
     Path(course_id): Path<i32>,
@@ -49,6 +61,21 @@ pub async fn get_modules_for_course(
     };
 }
 
+#[utoipa::path(
+    get,
+    description = "Возвращает информацию о модуле курса",
+    path = "/courses/{course_id}/modules/{module_id}",
+    params (
+        ("Authorization" = String, Header, description = "(Optional) JWT"),
+        ("course_id" = i32, Path, description = "Айди курса"),
+        ("module_id" = i32, Path, description = "Айди модуля")
+    ),
+    responses(
+        (status = 200, description = "Успешно", body = ModuleInfo),
+        (status = 201, description = "(200) Успешно. Ответ без поля 'theory'. Без токена", body = ModuleInfo),
+        (status = 500, description = "Не удалось зафетчить модули, что-то не так с БД", body = ErrorResponse)
+    )
+)]
 pub async fn get_module(
     State(state): State<AppState>,
     headers: HeaderMap,

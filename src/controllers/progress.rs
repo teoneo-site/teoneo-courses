@@ -2,9 +2,10 @@ use std::fmt::Display;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use crate::{db, AppState};
 
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
+#[derive(Serialize, Deserialize, PartialEq, Debug, ToSchema)]
 pub enum ProgressStatus {
     #[serde(rename = "EVAL")]
     Eval,
@@ -39,7 +40,7 @@ impl From<String> for ProgressStatus {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, ToSchema)]
 pub struct Progress {
     pub id: u32,
     pub user_id: u32,
@@ -48,6 +49,7 @@ pub struct Progress {
     pub submission: serde_json::Value,
     pub score: f32,
     pub attempts: i32,
+    #[schema(example = "2025-06-18T12:34:56Z", format = "date-time")]
     pub updated_at: DateTime<Utc>,
 }
 

@@ -1,6 +1,7 @@
 use std::fmt::Display;
 
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 use crate::{db, AppState};
 
@@ -32,7 +33,7 @@ pub const PROMPT_TEMPLATE: &'static str = r#"
 }
 "#;
 
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
+#[derive(Serialize, Deserialize, PartialEq, Debug, ToSchema)]
 pub enum TaskType {
     #[serde(rename = "QUIZ")]
     Quiz,
@@ -67,7 +68,7 @@ impl From<String> for TaskType {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, ToSchema)]
 pub struct TaskShortInfo {
     pub id: i32,
     pub module_id: i32,
@@ -96,7 +97,7 @@ impl TaskShortInfo {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, ToSchema)]
 pub struct Task {
     pub id: i32,
     pub module_id: i32,

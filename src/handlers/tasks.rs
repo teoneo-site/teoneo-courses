@@ -14,8 +14,8 @@ use crate::{
     common::token::Claims,
     controllers::{
         self,
-        progress::{self, ProgressStatus},
-        task::{process_prompt_task, TaskType},
+        progress::{self, Progress, ProgressStatus},
+        task::{process_prompt_task, Task, TaskShortInfo, TaskType},
     },
     db,
     handlers::{self, ErrorTypes},
@@ -29,6 +29,23 @@ pub struct StatusQueryOptional {
     with_status: bool,
 }
 
+
+#[utoipa::path(
+    get,
+    description = "Возвращает задания модуля",
+    path = "/courses/{course_id}/modules/{module_id}/tasks",
+    params (
+        ("Authorization" = String, Header, description = "JWT"),
+        ("course_id" = i32, Path, description = "Айди курса"),
+        ("module_id" = i32, Path, description = "Айди модуля"),
+        ("with_status" = bool, Query, description = "(Optional) С true задание вернется со статусом прогресса")
+    ),
+    responses(
+        (status = 200, description = "Успешно", body = TaskShortInfo),
+        (status = 403, description = "Пользователь не владеет курсом", body = ErrorResponse),
+        (status = 500, description = "Не получилось зафетчить задания, что-то с БД", body = ErrorResponse)
+    )
+)]
 pub async fn get_tasks_for_module(
     State(state): State<AppState>,
     OptionalQuery(query_data): OptionalQuery<StatusQueryOptional>,
@@ -85,6 +102,23 @@ pub struct ProgressQueryOptional {
     with_progress: bool,
 }
 
+#[utoipa::path(
+    get,
+    description = "Возвращает задание модуля",
+    path = "/courses/{course_id}/modules/{module_id}/tasks/{task_id}",
+    params (
+        ("Authorization" = String, Header, description = "JWT"),
+        ("course_id" = i32, Path, description = "Айди курса"),
+        ("module_id" = i32, Path, description = "Айди модуля"),
+        ("task_id" = i32, Path, description = "Айди задания"),
+        ("with_progress" = bool, Query, description = "(Optional) С true задание вернется со статусом прогресса и score (0.0 - 1.0)")
+    ),
+    responses(
+        (status = 200, description = "Успешно", body = Task),
+        (status = 403, description = "Пользователь не владеет курсом", body = ErrorResponse),
+        (status = 500, description = "Не получилось зафетчить задание, что-то с БД", body = ErrorResponse)
+    )
+)]
 pub async fn get_task(
     State(state): State<AppState>,
     OptionalQuery(query_data): OptionalQuery<ProgressQueryOptional>,
@@ -142,7 +176,23 @@ pub struct SubmitPayload {
     pub data: serde_json::Value, // Which can be either QuizUserAnswer or MatchingUserAnswer
 }
 
+
 // POST /course/.../modules/.../tasks/.../submit
+#[utoipa::path(
+    post,
+    description = "Отправляет задание на `асинхронную` проверку. Фетчить результат проверки нужно `/progress`. Принимает JSON: data: { answers: [0, 0, 1] } для match и quiz. data: { user_prompt: 'string' } для prompt",
+    path = "/courses/{course_id}/modules/{module_id}/tasks/{task_id}/submit",
+    params (
+        ("Authorization" = String, Header, description = "JWT"),
+        ("course_id" = i32, Path, description = "Айди курса"),
+        ("module_id" = i32, Path, description = "Айди модуля"),
+        ("task_id" = i32, Path, description = "Айди задания"),
+    ),
+    responses(
+        (status = 200, description = "Успешно"),
+        (status = 403, description = "Пользователь не владеет курсом", body = ErrorResponse),
+    )
+)]
 pub async fn submit_task(
     State(state): State<AppState>,
     claims: Claims,
@@ -262,6 +312,21 @@ pub async fn submit_task(
 }
 
 // GET /course/.../modules/.../tasks/.../progress
+#[utoipa::path(
+    get,
+    description = "Используется чтоб получить статус обработки задания",
+    path = "/courses/{course_id}/modules/{module_id}/tasks/{task_id}/progress",
+    params (
+        ("Authorization" = String, Header, description = "JWT"),
+        ("course_id" = i32, Path, description = "Айди курса"),
+        ("module_id" = i32, Path, description = "Айди модуля"),
+        ("task_id" = i32, Path, description = "Айди задания"),
+    ),
+    responses(
+        (status = 200, description = "Успешно", body = Progress),
+        (status = 403, description = "Пользователь не владеет курсом", body = ErrorResponse),
+    )
+)]
 pub async fn task_progress(
     State(state): State<AppState>,
     claims: Claims,

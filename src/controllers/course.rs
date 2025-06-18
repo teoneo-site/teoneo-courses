@@ -1,7 +1,8 @@
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 use crate::{db, AppState};
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, ToSchema)]
 pub struct BasicCourseInfo {
     pub id: i32,
     pub title: String,
@@ -35,7 +36,7 @@ impl BasicCourseInfo {
 }
 
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, ToSchema)]
 pub struct ExtendedCourseInfo {
     pub id: i32,
     pub title: String,
@@ -98,7 +99,7 @@ impl ShortCourseInfo {
     }
 }
 
-#[derive(Serialize, Deserialize, Default, sqlx::FromRow)]
+#[derive(Serialize, Deserialize, Default, sqlx::FromRow, ToSchema)]
 pub struct CourseProgress {
     pub course_id: i32,
     pub tasks_passed: i32,

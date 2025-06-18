@@ -1,7 +1,8 @@
 use axum::{extract::{Query, State}, http::StatusCode, response::{IntoResponse, Response}};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
-use crate::{common::token::Claims, controllers, handlers::{self, ErrorTypes}, AppState};
+use crate::{common::token::Claims, controllers::{self, user::{UserInfo, UserInfoFull, UserStats}}, handlers::{self, ErrorResponse, ErrorTypes}, AppState};
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -37,6 +38,25 @@ async fn handle_result<T: Serialize>(fut: impl std::future::Future<Output = anyh
     }
 }
 
+#[derive(ToSchema)]
+struct RespForUtoipa {
+    data: Vec<i32>
+}
+
+#[utoipa::path(
+    get,
+    description = "Используется для получения информации о юзере в зависимости от параметра (username, email, owned_courses). Если",
+    path = "/user/info",
+    params (
+        ("value" = String, Query, description = "Принимает courses, user, all"),
+         ("Authorization" = String, Header, description = "JWT")
+    ),
+    responses(
+        (status = 200, description = "При значении all", body = UserInfoFull),
+        (status = 201, description = "(200) При значении user", body = UserInfo),
+        (status = 203, description = "(200) При значении courses", body = RespForUtoipa),
+    )
+)]
 pub async fn get_user_info_and_courses(
     State(state): State<AppState>,
     claims: Claims,
@@ -56,6 +76,18 @@ pub async fn get_user_info_and_courses(
     }
 }
 
+#[utoipa::path(
+    get,
+    path = "/user/stats",
+    description = "Возвращает статистику пользователя",
+    params(
+        ("Authorization" = String, Header, description = "JWT")
+    ),
+    responses(
+        (status = 200, description = "Успешно", body = UserStats),
+        (status = 500, description = "Ошибка. Скорее всего, потому что пользователя не существует", body = ErrorResponse),
+    )
+)]
 pub async fn get_user_stats(State(state): State<AppState>, claims: Claims) -> Result<Response, Response> {
     let user_id = claims.id;
     match controllers::user::get_user_stats(&state, user_id).await {

@@ -1,6 +1,7 @@
 use std::fmt::Display;
 
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 // Types of handlers
 pub mod courses;
@@ -9,7 +10,7 @@ pub mod tasks;
 pub mod users;
 
 // Errors stuff
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, ToSchema)]
 pub struct ErrorResponse {
     error_type: String,
     error_msg: String,
