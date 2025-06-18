@@ -169,5 +169,6 @@ async fn main() {
     let router = get_router(app_state);
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await.unwrap();
+    tracing::info!("Started on port 8080");
     axum::serve(listener, router).await.unwrap();
 }
