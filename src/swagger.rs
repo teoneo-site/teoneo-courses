@@ -2,9 +2,6 @@ use utoipa::OpenApi;
 
 use crate::handlers;
 
-
-
-
 pub struct SecurityAddon;
 impl utoipa::Modify for SecurityAddon {
     fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
@@ -13,8 +10,8 @@ impl utoipa::Modify for SecurityAddon {
                 "api_key",
                 utoipa::openapi::security::SecurityScheme::ApiKey(
                     utoipa::openapi::security::ApiKey::Header(
-                        utoipa::openapi::security::ApiKeyValue::new("VLADIVOSTOK85000")
-                    )
+                        utoipa::openapi::security::ApiKeyValue::new("VLADIVOSTOK85000"),
+                    ),
                 ),
             );
         }

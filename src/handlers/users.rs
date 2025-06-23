@@ -1,8 +1,19 @@
-use axum::{extract::{Query, State}, http::StatusCode, response::{IntoResponse, Response}};
+use axum::{
+    extract::{Query, State},
+    http::StatusCode,
+    response::{IntoResponse, Response},
+};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::{common::token::Claims, controllers::{self, user::{UserInfo, UserInfoFull, UserStats}}, handlers::{self, ErrorResponse, ErrorTypes}, AppState};
+use crate::{
+    common::{error::{AppError, ErrorResponse}, token::Claims},
+    controllers::{
+        self,
+        user::{UserInfo, UserInfoFull, UserStats},
+    },
+    AppState,
+};
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -14,33 +25,21 @@ pub enum ValueInfo {
 
 #[derive(Serialize, Deserialize)]
 pub struct UserInfoQuery {
-    value: ValueInfo
+    value: ValueInfo,
 }
 
-async fn handle_result<T: Serialize>(fut: impl std::future::Future<Output = anyhow::Result<T>>) -> Result<Response, Response> {
+async fn handle_result<T: Serialize>(
+    fut: impl std::future::Future<Output = anyhow::Result<T>>,
+) -> Result<Response, AppError> {
     let mut json_obj = serde_json::Value::Object(serde_json::Map::new());
-    match fut.await {
-        Ok(info) => {
-            json_obj["data"] = serde_json::to_value(&info).unwrap(); // Why would it panic?
-            return Ok((StatusCode::OK, axum::Json(json_obj)).into_response())
-        }
-        Err(why) => {
-            eprintln!("Could not handle get user info result: {}", why);
-            return Err((
-                StatusCode::INTERNAL_SERVER_ERROR,
-                axum::Json(handlers::ErrorResponse::new(
-                    ErrorTypes::InternalError,
-                    &format!("Something happened: {}", why),
-                )), // Should not panic, because struct is always valid for converting into JSON
-            )
-                .into_response());
-        }
-    }
+    let resp = fut.await?;
+    json_obj["data"] = serde_json::to_value(&resp).unwrap(); // Why would it panic?
+    Ok((StatusCode::OK, axum::Json(json_obj)).into_response())
 }
 
 #[derive(ToSchema)]
 struct RespForUtoipa {
-    data: Vec<i32>
+    data: Vec<i32>,
 }
 
 #[utoipa::path(
@@ -55,13 +54,14 @@ struct RespForUtoipa {
         (status = 200, description = "При значении all", body = UserInfoFull),
         (status = 201, description = "(200) При значении user", body = UserInfo),
         (status = 203, description = "(200) При значении courses", body = RespForUtoipa),
+        (status = 500, description = "Что-то случилось", body = ErrorResponse),
     )
 )]
 pub async fn get_user_info_and_courses(
     State(state): State<AppState>,
     claims: Claims,
-    Query(value) : Query<UserInfoQuery>,
-) -> Result<Response, Response> {
+    Query(value): Query<UserInfoQuery>,
+) -> Result<Response, AppError> {
     let user_id = claims.id;
     match value.value {
         ValueInfo::All => {
@@ -70,9 +70,7 @@ pub async fn get_user_info_and_courses(
         ValueInfo::Courses => {
             handle_result(controllers::user::get_courses_info(&state, user_id)).await
         }
-        ValueInfo::User => {
-            handle_result(controllers::user::get_user_info(&state, user_id)).await
-        }
+        ValueInfo::User => handle_result(controllers::user::get_user_info(&state, user_id)).await,
     }
 }
 
@@ -85,25 +83,14 @@ pub async fn get_user_info_and_courses(
     ),
     responses(
         (status = 200, description = "Успешно", body = UserStats),
-        (status = 500, description = "Ошибка. Скорее всего, потому что пользователя не существует", body = ErrorResponse),
+        (status = 500, description = "Что-то случилось", body = ErrorResponse),
     )
 )]
-pub async fn get_user_stats(State(state): State<AppState>, claims: Claims) -> Result<Response, Response> {
+pub async fn get_user_stats(
+    State(state): State<AppState>,
+    claims: Claims,
+) -> Result<Response, AppError> {
     let user_id = claims.id;
-    match controllers::user::get_user_stats(&state, user_id).await {
-        Ok(stats) => {
-            return Ok((StatusCode::OK, axum::Json(stats)).into_response())
-        }
-        Err(why) => {
-            eprintln!("Why failed to fetch stats: {}", why);
-            return Err((
-                StatusCode::INTERNAL_SERVER_ERROR,
-                axum::Json(handlers::ErrorResponse::new(
-                    ErrorTypes::InternalError,
-                    &format!("Could not fetch user stats, probably user does not exist: {}", why),
-                )), // Should not panic, because struct is always valid for converting into JSON
-            )
-                .into_response());
-        }
-    }
+    let stats = controllers::user::get_user_stats(&state, user_id).await?;
+    Ok((StatusCode::OK, axum::Json(stats)).into_response())
 }

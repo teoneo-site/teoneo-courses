@@ -11,24 +11,25 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::{
-    common::token::Claims,
+    common::{
+        error::{AppError, ErrorResponse, ErrorTypes},
+        token::Claims,
+    },
     controllers::{
         self,
         progress::{self, Progress, ProgressStatus},
         task::{process_prompt_task, Task, TaskShortInfo, TaskType},
     },
-    db,
-    handlers::{self, ErrorTypes},
+    db, error_response,
+    handlers::{self},
     AppState,
 };
 
-use super::ErrorResponse;
 
 #[derive(Serialize, Deserialize)]
 pub struct StatusQueryOptional {
     with_status: bool,
 }
-
 
 #[utoipa::path(
     get,
@@ -43,7 +44,7 @@ pub struct StatusQueryOptional {
     responses(
         (status = 200, description = "Успешно", body = TaskShortInfo),
         (status = 403, description = "Пользователь не владеет курсом", body = ErrorResponse),
-        (status = 500, description = "Не получилось зафетчить задания, что-то с БД", body = ErrorResponse)
+        (status = 500, description = "Что-то случилось", body = ErrorResponse)
     )
 )]
 pub async fn get_tasks_for_module(
@@ -51,21 +52,22 @@ pub async fn get_tasks_for_module(
     OptionalQuery(query_data): OptionalQuery<StatusQueryOptional>,
     claims: Claims,
     Path((course_id, module_id)): Path<(i32, i32)>,
-) -> Result<Response, Response> {
+) -> Result<Response, AppError> {
     let user_id = claims.id as i32;
-    if let Err(why) = controllers::course::verify_ownership(&state, claims.id as i32, course_id).await {
+    if let Err(why) =
+        controllers::course::verify_ownership(&state, claims.id as i32, course_id).await
+    {
         tracing::error!("Could not verify course ownership {}", why);
-        return Err((
+
+        return Ok(error_response!(
             StatusCode::FORBIDDEN,
-            axum::Json(ErrorResponse::new(
-                ErrorTypes::CourseNotOwned,
-                "User does not own this course",
-            )),
-        )
-            .into_response());
+            ErrorTypes::CourseNotOwned,
+            "User does not own this course"
+        ));
     }
     let should_display_status = query_data.map(|val| val.with_status).unwrap_or(false);
-    match controllers::task::get_tasks_for_module(
+
+    let tasks = controllers::task::get_tasks_for_module(
         &state,
         module_id,
         if should_display_status {
@@ -74,27 +76,12 @@ pub async fn get_tasks_for_module(
             None
         },
     )
-    .await
-    {
-        Ok(tasks) => {
-            let body = json!({
-                "data": tasks,
-            });
+    .await?;
+    let body = json!({
+        "data": tasks,
+    });
 
-            return Ok((StatusCode::OK, axum::Json(body)).into_response());
-        }
-        Err(why) => {
-            tracing::error!("Why failed: {}", why);
-            return Err((
-                StatusCode::INTERNAL_SERVER_ERROR,
-                axum::Json(handlers::ErrorResponse::new(
-                    ErrorTypes::InternalError,
-                    &format!("Could not fetch tasks for module: {}", why),
-                )), // Should not panic, because struct is always valid for converting into JSON
-            )
-                .into_response());
-        }
-    };
+    return Ok((StatusCode::OK, axum::Json(body)).into_response());
 }
 
 #[derive(Serialize, Deserialize)]
@@ -116,7 +103,7 @@ pub struct ProgressQueryOptional {
     responses(
         (status = 200, description = "Успешно", body = Task),
         (status = 403, description = "Пользователь не владеет курсом", body = ErrorResponse),
-        (status = 500, description = "Не получилось зафетчить задание, что-то с БД", body = ErrorResponse)
+        (status = 500, description = "Что-то случилось", body = ErrorResponse)
     )
 )]
 pub async fn get_task(
@@ -124,58 +111,37 @@ pub async fn get_task(
     OptionalQuery(query_data): OptionalQuery<ProgressQueryOptional>,
     claims: Claims,
     Path((course_id, module_id, task_id)): Path<(i32, i32, i32)>,
-) -> Result<Response, Response> {
+) -> Result<Response, AppError> {
     let user_id = claims.id as i32;
-    if let Err(why) =  controllers::course::verify_ownership(&state, claims.id as i32, course_id).await {
+    if let Err(why) =
+        controllers::course::verify_ownership(&state, claims.id as i32, course_id).await
+    {
         // Does not own the course
         tracing::error!("Could not verify course ownership {}", why);
-        return Err((
+        return Ok(error_response!(
             StatusCode::FORBIDDEN,
-            axum::Json(ErrorResponse::new(
-                ErrorTypes::CourseNotOwned,
-                "User does not own this course",
-            )),
-        )
-            .into_response());
+            ErrorTypes::CourseNotOwned,
+            "User does not own this course"
+        ));
     }
     let should_display_progress = query_data.map(|val| val.with_progress).unwrap_or(false);
-    match controllers::task::get_task(
-        &state,
-        module_id,
-        task_id,
-        if should_display_progress {
-            user_id.into()
-        } else {
-            None
-        },
-    )
-    .await
-    {
-        Ok(task) => {
-            let body = json!({
-                "data": task,
-            });
-            return Ok((StatusCode::OK, axum::Json(body)).into_response());
-        }
-        Err(why) => {
-            tracing::error!("Could not fetch one task: {}", why);
-            return Err((
-                StatusCode::INTERNAL_SERVER_ERROR,
-                axum::Json(handlers::ErrorResponse::new(
-                    ErrorTypes::InternalError,
-                    &format!("Could not fetch the task: {}", why),
-                )),
-            )
-                .into_response());
-        }
+
+    let usr = if should_display_progress {
+        user_id.into()
+    } else {
+        None
     };
+    let task = controllers::task::get_task(&state, module_id, task_id, usr).await?;
+    let body = json!({
+        "data": task,
+    });
+    return Ok((StatusCode::OK, axum::Json(body)).into_response());
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct SubmitPayload {
     pub data: serde_json::Value, // Which can be either QuizUserAnswer or MatchingUserAnswer
 }
-
 
 // POST /course/.../modules/.../tasks/.../submit
 #[utoipa::path(
@@ -191,6 +157,7 @@ pub struct SubmitPayload {
     responses(
         (status = 200, description = "Успешно"),
         (status = 403, description = "Пользователь не владеет курсом", body = ErrorResponse),
+        (status = 500, description = "Что-то случилось", body = ErrorResponse)
     )
 )]
 pub async fn submit_task(
@@ -198,35 +165,21 @@ pub async fn submit_task(
     claims: Claims,
     Path((course_id, _module_id, task_id)): Path<(i32, i32, i32)>, // We dont really need module_id tho, just course (not necessary and)
     Json(user_answers): Json<serde_json::Value>,
-) -> Result<Response, Response> {
+) -> Result<Response, AppError> {
     let user_id = claims.id;
-    if let Err(why) = controllers::course::verify_ownership(&state, user_id as i32, course_id).await {
+    if let Err(why) = controllers::course::verify_ownership(&state, user_id as i32, course_id).await
+    {
         // Does not own the course
         tracing::error!("Could not verify course ownership {}", why);
-        return Err((
+        return Ok(error_response!(
             StatusCode::FORBIDDEN,
-            axum::Json(ErrorResponse::new(
-                ErrorTypes::CourseNotOwned,
-                "User does not own this course",
-            )),
-        )
-            .into_response());
+            ErrorTypes::CourseNotOwned,
+            "User does not own this course: {}",
+            why
+        ));
     }
 
-    let task_type = match db::taskdb::fetch_task_type(&state.pool, task_id).await {
-        Ok(task_type) => task_type,
-        Err(why) => {
-            tracing::error!("Could not getch task type: {}", why);
-            return Err((
-                StatusCode::INTERNAL_SERVER_ERROR,
-                axum::Json(handlers::ErrorResponse::new(
-                    ErrorTypes::InternalError,
-                    &format!("Could not fetch the task type. Task doesnt exist: {}", why),
-                )), // Should not panic, because struct is always valid for converting into JSON
-            )
-                .into_response());
-        }
-    };
+    let task_type = db::taskdb::fetch_task_type(&state.pool, task_id).await?;
 
     // Insert EVAL progress status
     // Frontend can query status at this point
@@ -244,25 +197,14 @@ pub async fn submit_task(
 
     match task_type {
         TaskType::Quiz | TaskType::Match => {
-            if let Err(why) = controllers::task::submit_quiz_task(
+            controllers::task::submit_quiz_task(
                 &state,
                 claims.id,
                 task_id,
                 task_type,
                 user_answers,
             )
-            .await
-            {
-                tracing::error!("Could not submit quiz|match task: {}", why);
-                return Err((
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    axum::Json(handlers::ErrorResponse::new(
-                        ErrorTypes::InternalError,
-                        &format!("Error when submiting a quiz/match task: {}", why),
-                    )),
-                )
-                    .into_response());
-            }
+            .await?;
             return Ok((StatusCode::ACCEPTED).into_response());
         }
         TaskType::Prompt => {
@@ -272,39 +214,36 @@ pub async fn submit_task(
                     .unwrap(); // So unwrap() should not panic
             if attempts >= max_attemps {
                 // Signal using 400 that max attempts is hit
-                return Err((
+                return Ok(error_response!(
                     StatusCode::BAD_REQUEST,
-                    axum::Json(handlers::ErrorResponse::new(
-                        ErrorTypes::MaxAttemptsSubmit,
-                        "Try again later",
-                    )), // Should not panic, because struct is always valid for converting into JSON
-                )
-                    .into_response());
+                    ErrorTypes::MaxAttemptsSubmit,
+                    "Try again later"
+                ));
             }
 
             if let Err(why) = process_prompt_task(state, claims.id, task_id, user_answers).await {
                 tracing::error!("Error submiting prompt task: {}", why);
-                return Err((
+
+                return Ok(error_response!(
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    axum::Json(handlers::ErrorResponse::new(
-                        ErrorTypes::InternalError,
-                        &format!("Error when submiting a prompt task: {}", why),
-                    )),
-                )
-                    .into_response());
+                    ErrorTypes::InternalError,
+                    "Error when submiting a prompt task: {}",
+                    why
+                ));
             }
         }
         TaskType::Lecture => {
             progress::update_or_insert_status(
-            &state,
-            user_id,
-            task_id,
-            ProgressStatus::Success,
-            "None".to_owned(),
-            5.0,
-            1,
+                &state,
+                user_id,
+                task_id,
+                ProgressStatus::Success,
+                "None".to_owned(),
+                5.0,
+                1,
             )
-            .await.unwrap();
+            .await
+            .unwrap();
         }
     };
 
@@ -325,44 +264,31 @@ pub async fn submit_task(
     responses(
         (status = 200, description = "Успешно", body = Progress),
         (status = 403, description = "Пользователь не владеет курсом", body = ErrorResponse),
+        (status = 500, description = "Что-то случилось", body = ErrorResponse)
     )
 )]
 pub async fn task_progress(
     State(state): State<AppState>,
     claims: Claims,
     Path((course_id, _module_id, task_id)): Path<(i32, i32, i32)>,
-) -> Result<Response, Response> {
+) -> Result<Response, AppError> {
     let user_id = claims.id;
-    if let Err(why) = controllers::course::verify_ownership(&state, claims.id as i32, course_id).await {
+    if let Err(why) =
+        controllers::course::verify_ownership(&state, claims.id as i32, course_id).await
+    {
         // Does not own the course
         tracing::error!("Could not verify course ownership {}", why);
-        return Err((
+        return Ok(error_response!(
             StatusCode::FORBIDDEN,
-            axum::Json(ErrorResponse::new(
-                ErrorTypes::CourseNotOwned,
-                "User does not own this course",
-            )),
-        )
-            .into_response());
+            ErrorTypes::CourseNotOwned,
+            "User does not own this course"
+        ));
     }
-    match controllers::progress::get_task_progress(&state, user_id, task_id).await {
-        Ok(progress) => {
-            let body = json!({
-                "data": progress
-            });
 
-            return Ok((StatusCode::OK, axum::Json(body)).into_response());
-        }
-        Err(why) => {
-            tracing::error!("Could not get progress (handler): {}", why);
-            return Err((
-                StatusCode::INTERNAL_SERVER_ERROR,
-                axum::Json(handlers::ErrorResponse::new(
-                    ErrorTypes::InternalError,
-                    &format!("Could not fetch the task progress: {}", why),
-                )), // Should not panic, because struct is always valid for converting into JSON
-            )
-                .into_response());
-        }
-    }
+    let progress = controllers::progress::get_task_progress(&state, user_id, task_id).await?;
+    let body = json!({
+        "data": progress
+    });
+
+    Ok((StatusCode::OK, axum::Json(body)).into_response())
 }

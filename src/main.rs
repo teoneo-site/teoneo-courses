@@ -10,12 +10,13 @@ use gigalib::{
     controllers::client::{ClientBuilder, GigaClient},
     http::message::{MessageConfig, MessageConfigBuilder},
 };
-use handlers::ErrorTypes;
 use sqlx::{mysql::MySqlPoolOptions, MySql, Pool};
 use tower::{buffer::BufferLayer, limit::RateLimitLayer, ServiceBuilder};
 use tower_http::{catch_panic::CatchPanicLayer, cors::CorsLayer};
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
+
+use crate::common::error::{ErrorResponse, ErrorTypes};
 
 mod common;
 mod controllers;
@@ -27,7 +28,7 @@ mod swagger;
 struct AppState {
     pool: Pool<MySql>,
     ai: GigaClient,
-    redis: r2d2::Pool<redis::Client>
+    redis: r2d2::Pool<redis::Client>,
 }
 
 fn internal_server_error_handler(err: Box<dyn Any + Send + 'static>) -> Response {
@@ -41,7 +42,7 @@ fn internal_server_error_handler(err: Box<dyn Any + Send + 'static>) -> Response
     println!("Internal server error catched: {}", details);
     (
         StatusCode::INTERNAL_SERVER_ERROR,
-        axum::Json(handlers::ErrorResponse::new(
+        axum::Json(ErrorResponse::new(
             ErrorTypes::InternalError,
             &details,
         )), // Should not panic, because struct is always valid for converting into JSON
@@ -78,11 +79,11 @@ fn get_router(app_state: AppState) -> Router {
     let app = Router::new()
         .route(
             "/user/info",
-            axum::routing::get(handlers::users::get_user_info_and_courses)
+            axum::routing::get(handlers::users::get_user_info_and_courses),
         )
         .route(
             "/user/stats",
-            axum::routing::get(handlers::users::get_user_stats)
+            axum::routing::get(handlers::users::get_user_stats),
         )
         .route(
             "/courses",
@@ -98,7 +99,7 @@ fn get_router(app_state: AppState) -> Router {
         )
         .route(
             "/courses/{course_id}/progress",
-            axum::routing::get(handlers::courses::get_course_progress)
+            axum::routing::get(handlers::courses::get_course_progress),
         )
         .route(
             "/courses/{course_id}/modules",
@@ -110,13 +111,12 @@ fn get_router(app_state: AppState) -> Router {
         )
         .route(
             "/courses/{course_id}/favour",
-            axum::routing::post(handlers::courses::add_course_to_favourite)
+            axum::routing::post(handlers::courses::add_course_to_favourite),
         )
         .route(
             "/courses/favourite",
-            axum::routing::get(handlers::courses::get_favourite_courses)
+            axum::routing::get(handlers::courses::get_favourite_courses),
         )
-        
         .route(
             "/courses/{course_id}/modules/{module_id}/tasks",
             axum::routing::get(handlers::tasks::get_tasks_for_module),
@@ -142,7 +142,7 @@ fn get_router(app_state: AppState) -> Router {
                     eprintln!("{}", err);
                     (
                         StatusCode::INTERNAL_SERVER_ERROR,
-                        axum::Json(handlers::ErrorResponse::new(
+                        axum::Json(ErrorResponse::new(
                             ErrorTypes::InternalError,
                             "Internal error occured",
                         )),
@@ -162,9 +162,13 @@ async fn main() {
     dotenv::dotenv().ok();
 
     let app_state = AppState {
-        pool: get_db_pool().await.expect("Could not connect to the database"),
-        ai: get_gigachat_client().await.expect("Could not connect to gigachat"),
-        redis: get_redis_pool().await.expect("Could not connect to redis")
+        pool: get_db_pool()
+            .await
+            .expect("Could not connect to the database"),
+        ai: get_gigachat_client()
+            .await
+            .expect("Could not connect to gigachat"),
+        redis: get_redis_pool().await.expect("Could not connect to redis"),
     };
     let router = get_router(app_state);
 

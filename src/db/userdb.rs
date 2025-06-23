@@ -7,13 +7,12 @@ use crate::controllers::user::UserInfo;
 use crate::controllers::user::UserInfoFull;
 use crate::AppState;
 
-
 pub async fn get_user_info(state: &AppState, user_id: u32) -> anyhow::Result<UserInfo> {
     let cache_key = format!("user:{}", user_id);
-    if let Ok(mut conn) = state.redis.get() { 
+    if let Ok(mut conn) = state.redis.get() {
         if let Ok(val) = conn.get::<&str, String>(&cache_key) {
             if let Ok(user_info_struct) = serde_json::from_str::<UserInfo>(&val) {
-                return Ok(user_info_struct)
+                return Ok(user_info_struct);
             }
         }
     }
@@ -32,7 +31,7 @@ pub async fn get_user_info(state: &AppState, user_id: u32) -> anyhow::Result<Use
     userinfo.username = row.0;
     userinfo.email = row.1;
 
-    if let Ok(mut conn) = state.redis.get() { 
+    if let Ok(mut conn) = state.redis.get() {
         let result_str = serde_json::to_string(&userinfo).unwrap(); // Should not panic
         conn.set_ex(cache_key, result_str, 300).unwrap_or(()); // Don't care if it fails
     }
@@ -41,10 +40,10 @@ pub async fn get_user_info(state: &AppState, user_id: u32) -> anyhow::Result<Use
 
 pub async fn get_user_info_all(state: &AppState, user_id: u32) -> anyhow::Result<UserInfoFull> {
     let cache_key = format!("user:info:all:{}", user_id);
-    if let Ok(mut conn) = state.redis.get() { 
+    if let Ok(mut conn) = state.redis.get() {
         if let Ok(val) = conn.get::<&str, String>(&cache_key) {
             if let Ok(info_struct) = serde_json::from_str::<UserInfoFull>(&val) {
-                return Ok(info_struct)
+                return Ok(info_struct);
             }
         }
     }
@@ -62,10 +61,10 @@ pub async fn get_user_info_all(state: &AppState, user_id: u32) -> anyhow::Result
         .fetch_all(&state.pool)
         .await?;
     if rows.is_empty() {
-        return Err(sqlx::Error::RowNotFound.into())
+        return Err(sqlx::Error::RowNotFound.into());
     }
     let mut userinfo = UserInfoFull::default();
-    
+
     let first_element = rows.first().unwrap(); // We checked, that rows aren't empty
     let username: String = first_element.try_get("username").unwrap(); // It exists in the row 100%, because, rows aren't empty => user eists
     let email: String = first_element.try_get("email").unwrap(); // Same  here
@@ -78,11 +77,11 @@ pub async fn get_user_info_all(state: &AppState, user_id: u32) -> anyhow::Result
         let course_id: Option<i32> = row.try_get("course_id")?;
         if let Some(course_id) = course_id {
             courses.push(course_id);
-        } 
+        }
     }
     userinfo.courses = courses;
 
-    if let Ok(mut conn) = state.redis.get() { 
+    if let Ok(mut conn) = state.redis.get() {
         let result_str = serde_json::to_string(&userinfo).unwrap(); // Should not panic
         conn.set_ex(cache_key, result_str, 300).unwrap_or(());
     }
@@ -90,13 +89,12 @@ pub async fn get_user_info_all(state: &AppState, user_id: u32) -> anyhow::Result
     Ok(userinfo)
 }
 
-
 pub async fn get_courses_info(state: &AppState, user_id: u32) -> anyhow::Result<Vec<i32>> {
     let cache_key = format!("user:info:courses:{}", user_id);
-    if let Ok(mut conn) = state.redis.get() { 
+    if let Ok(mut conn) = state.redis.get() {
         if let Ok(val) = conn.get::<&str, String>(&cache_key) {
             if let Ok(courses_info_struct) = serde_json::from_str::<Vec<i32>>(&val) {
-                return Ok(courses_info_struct)
+                return Ok(courses_info_struct);
             }
         }
     }
@@ -117,22 +115,25 @@ pub async fn get_courses_info(state: &AppState, user_id: u32) -> anyhow::Result<
         let course_id: Option<i32> = row.try_get("course_id")?;
         if let Some(course_id) = course_id {
             courses.push(course_id);
-        } 
+        }
     }
-        
-    if let Ok(mut conn) = state.redis.get() { 
+
+    if let Ok(mut conn) = state.redis.get() {
         let result_str = serde_json::to_string(&courses).unwrap();
         conn.set_ex(cache_key, result_str, 120).unwrap_or(());
     }
     Ok(courses)
 }
 
-pub async fn get_user_stats(state: &AppState, user_id: u32) -> anyhow::Result<controllers::user::UserStats> {
+pub async fn get_user_stats(
+    state: &AppState,
+    user_id: u32,
+) -> anyhow::Result<controllers::user::UserStats> {
     let cache_key = format!("user:stats:{}", user_id);
-    if let Ok(mut conn) = state.redis.get() { 
+    if let Ok(mut conn) = state.redis.get() {
         if let Ok(val) = conn.get::<&str, String>(&cache_key) {
             if let Ok(stats_info) = serde_json::from_str::<controllers::user::UserStats>(&val) {
-                return Ok(stats_info)
+                return Ok(stats_info);
             }
         }
     }
@@ -176,8 +177,12 @@ pub async fn get_user_stats(state: &AppState, user_id: u32) -> anyhow::Result<co
         .fetch_one(&state.pool)
         .await?;
 
-    let info = controllers::user::UserStats { courses_owned: row.0, courses_started: row.1, courses_completed: row.2.unwrap_or(0) };
-    if let Ok(mut conn) = state.redis.get() { 
+    let info = controllers::user::UserStats {
+        courses_owned: row.0,
+        courses_started: row.1,
+        courses_completed: row.2.unwrap_or(0),
+    };
+    if let Ok(mut conn) = state.redis.get() {
         let result_str = serde_json::to_string(&info).unwrap();
         conn.set_ex(cache_key, result_str, 120).unwrap_or(());
     }

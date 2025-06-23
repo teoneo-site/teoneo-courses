@@ -1,9 +1,9 @@
 use std::fmt::Display;
 
+use crate::{db, AppState};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-use crate::{db, AppState};
 
 #[derive(Serialize, Deserialize, PartialEq, Debug, ToSchema)]
 pub enum ProgressStatus {

@@ -10,20 +10,18 @@ use crate::AppState;
 
 impl<'r> sqlx::FromRow<'r, sqlx::mysql::MySqlRow> for TaskShortInfo {
     fn from_row(row: &'r sqlx::mysql::MySqlRow) -> Result<Self, sqlx::Error> {
-        Ok(
-            Self {
-                id: row.try_get("id")?,
-                module_id: row.try_get("module_id")?,
-                title: row.try_get("title")?,
-                task_type: row.try_get::<String, _>("type")?.into(),
-                status: row
-                    .try_get::<Option<String>, _>("status")
-                    .map(|opt| opt.map(Into::into))
-                    .map_err(|_| ())
-                    .ok()
-                    .flatten()
-            }
-        )
+        Ok(Self {
+            id: row.try_get("id")?,
+            module_id: row.try_get("module_id")?,
+            title: row.try_get("title")?,
+            task_type: row.try_get::<String, _>("type")?.into(),
+            status: row
+                .try_get::<Option<String>, _>("status")
+                .map(|opt| opt.map(Into::into))
+                .map_err(|_| ())
+                .ok()
+                .flatten(),
+        })
     }
 }
 
@@ -84,20 +82,17 @@ impl<'r> sqlx::FromRow<'r, sqlx::mysql::MySqlRow> for Task {
                 })
             }
         };
-        Ok(
-            Self { 
-                id, 
-                module_id, 
-                title, 
-                task_type, 
-                content, 
-                status, 
-                score, 
-            }
-        )
+        Ok(Self {
+            id,
+            module_id,
+            title,
+            task_type,
+            content,
+            status,
+            score,
+        })
     }
 }
-
 
 pub async fn fetch_tasks_for_module(
     state: &AppState,
@@ -105,10 +100,10 @@ pub async fn fetch_tasks_for_module(
     user_id: Option<i32>,
 ) -> anyhow::Result<Vec<TaskShortInfo>> {
     let cache_key = format!("module:{}:tasks:all", module_id);
-    if let Ok(mut conn) = state.redis.get() { 
+    if let Ok(mut conn) = state.redis.get() {
         if let Ok(val) = conn.get::<&str, String>(&cache_key) {
             if let Ok(parsed_tasks) = serde_json::from_str::<Vec<TaskShortInfo>>(&val) {
-                return Ok(parsed_tasks)
+                return Ok(parsed_tasks);
             }
         }
     }
@@ -119,15 +114,17 @@ pub async fn fetch_tasks_for_module(
         .fetch_all(&state.pool)
         .await?
     } else {
-        sqlx::query_as::<_, TaskShortInfo>("SELECT id, module_id, title, type FROM tasks WHERE module_id = ?") // Todo: Pagination with LIMIT
-            .bind(module_id)
-            .fetch_all(&state.pool)
-            .await?
+        sqlx::query_as::<_, TaskShortInfo>(
+            "SELECT id, module_id, title, type FROM tasks WHERE module_id = ?",
+        ) // Todo: Pagination with LIMIT
+        .bind(module_id)
+        .fetch_all(&state.pool)
+        .await?
     };
 
-    if let Ok(mut conn) = state.redis.get() { 
+    if let Ok(mut conn) = state.redis.get() {
         let result_str = serde_json::to_string(&tasks).unwrap(); // Should not panic
-        let _ : () = conn.set_ex(&cache_key, result_str, 3600).unwrap_or(());
+        let _: () = conn.set_ex(&cache_key, result_str, 3600).unwrap_or(());
     }
     Ok(tasks)
 }
@@ -176,11 +173,12 @@ pub async fn fetch_task(
     user_id: Option<i32>,
 ) -> anyhow::Result<Task> {
     let cache_key = format!("task:{}", task_id);
-    if let Ok(mut conn) = state.redis.get() { 
-        if let Ok(val) = conn.get::<&str, String>(&cache_key) { // Cache is up to date (in terms of progress), becase we delete key, when updating progress
+    if let Ok(mut conn) = state.redis.get() {
+        if let Ok(val) = conn.get::<&str, String>(&cache_key) {
+            // Cache is up to date (in terms of progress), becase we delete key, when updating progress
             if let Ok(parsed_task) = serde_json::from_str(&val) {
-                return Ok(parsed_task)
-            } 
+                return Ok(parsed_task);
+            }
         }
     }
 
@@ -206,7 +204,6 @@ pub async fn fetch_task(
         .fetch_one(&state.pool)
         .await?
     } else {
-        
         sqlx::query_as::<_, Task>(
             "SELECT t.id, t.module_id, t.title, t.type,
                     q.question as qquestion, q.possible_answers, q.is_multiple,
@@ -225,9 +222,9 @@ pub async fn fetch_task(
         .await?
     };
 
-    if let Ok(mut conn) = state.redis.get() { 
+    if let Ok(mut conn) = state.redis.get() {
         let task_str = serde_json::to_string(&task).unwrap(); // Should not panic
-        let _ : () = conn.set_ex(&cache_key, task_str, 3600).unwrap_or(());
+        let _: () = conn.set_ex(&cache_key, task_str, 3600).unwrap_or(());
     }
 
     Ok(task)
@@ -237,9 +234,11 @@ pub async fn fetch_prompt_details(
     pool: &MySqlPool,
     task_id: i32,
 ) -> anyhow::Result<(String, Option<String>)> {
-    let row = sqlx::query_as::<_, (String, Option<String>)>("SELECT question, additional_prompt FROM prompts WHERE task_id = ?")
-        .bind(task_id)
-        .fetch_one(pool)
-        .await?;
+    let row = sqlx::query_as::<_, (String, Option<String>)>(
+        "SELECT question, additional_prompt FROM prompts WHERE task_id = ?",
+    )
+    .bind(task_id)
+    .fetch_one(pool)
+    .await?;
     Ok((row.0, row.1))
 }

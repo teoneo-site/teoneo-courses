@@ -6,7 +6,7 @@ use axum::{
 use jsonwebtoken::{decode, DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
 
-use crate::handlers::{ErrorResponse, ErrorTypes};
+use crate::common::error::{ErrorResponse, ErrorTypes};
 
 #[derive(Serialize, Deserialize)]
 pub struct Claims {

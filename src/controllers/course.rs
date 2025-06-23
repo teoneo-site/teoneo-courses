@@ -21,7 +21,7 @@ impl BasicCourseInfo {
         full_description: String,
         tags: Vec<String>,
         picture_url: String,
-        price: f64
+        price: f64,
     ) -> Self {
         Self {
             id,
@@ -34,7 +34,6 @@ impl BasicCourseInfo {
         }
     }
 }
-
 
 #[derive(Serialize, Deserialize, Clone, ToSchema)]
 pub struct ExtendedCourseInfo {
@@ -87,26 +86,31 @@ pub struct ShortCourseInfo {
     tasks_total: i32,
 }
 impl ShortCourseInfo {
-    pub fn new(course_id: i32, title: String, brief_description: String, picture_url: String, tasks_passed: i32, tasks_total: i32) -> Self {
-        Self { 
-            course_id, 
-            title, 
+    pub fn new(
+        course_id: i32,
+        title: String,
+        brief_description: String,
+        picture_url: String,
+        tasks_passed: i32,
+        tasks_total: i32,
+    ) -> Self {
+        Self {
+            course_id,
+            title,
             brief_description,
             picture_url,
             tasks_passed,
-            tasks_total
+            tasks_total,
         }
     }
 }
 
-#[derive(Serialize, Deserialize, Default, sqlx::FromRow, ToSchema)]
+#[derive(Serialize, Deserialize, Default, ToSchema)]
 pub struct CourseProgress {
-    pub course_id: i32,
-    pub tasks_passed: i32,
-    pub tasks_total: i32,
+    pub course_id: Option<i32>,
+    pub tasks_passed: Option<i64>,
+    pub tasks_total: Option<i64>,
 }
-
-
 
 // Currently, there is really no need for this method in the controller,
 // you can just call fetch from the handler,
@@ -116,7 +120,11 @@ pub async fn get_all_courses(pool: &AppState) -> anyhow::Result<Vec<i32>> {
     Ok(courses)
 }
 
-pub async fn add_course_to_favourite(pool: &AppState, user_id: u32, course_id: i32) -> anyhow::Result<()> {
+pub async fn add_course_to_favourite(
+    pool: &AppState,
+    user_id: u32,
+    course_id: i32,
+) -> anyhow::Result<()> {
     db::coursedb::add_course_to_favourite(pool, user_id, course_id).await
 }
 pub async fn get_favourite_courses(pool: &AppState, user_id: u32) -> anyhow::Result<Vec<i32>> {
@@ -124,17 +132,28 @@ pub async fn get_favourite_courses(pool: &AppState, user_id: u32) -> anyhow::Res
     Ok(ids)
 }
 
-pub async fn get_courses_by_ids_expanded(pool: &AppState, ids: Vec<i32>, user_id: u32) -> anyhow::Result<Vec<ExtendedCourseInfo>> {
+pub async fn get_courses_by_ids_expanded(
+    pool: &AppState,
+    ids: Vec<i32>,
+    user_id: u32,
+) -> anyhow::Result<Vec<ExtendedCourseInfo>> {
     let courses = db::coursedb::fetch_courses_by_ids_expanded(pool, ids, user_id).await?;
     Ok(courses)
 }
 
-pub async fn get_courses_by_ids_basic(pool: &AppState, ids: Vec<i32>) -> anyhow::Result<Vec<BasicCourseInfo>> {
+pub async fn get_courses_by_ids_basic(
+    pool: &AppState,
+    ids: Vec<i32>,
+) -> anyhow::Result<Vec<BasicCourseInfo>> {
     let courses = db::coursedb::fetch_courses_by_ids_basic(pool, ids).await?;
     Ok(courses)
 }
 
-pub async fn get_course_progress(pool: &AppState, course_id: i32, user_id: u32) -> anyhow::Result<CourseProgress> {
+pub async fn get_course_progress(
+    pool: &AppState,
+    course_id: i32,
+    user_id: u32,
+) -> anyhow::Result<CourseProgress> {
     let progress = db::coursedb::get_course_progress(pool, user_id, course_id).await?;
     Ok(progress)
 }
@@ -142,7 +161,11 @@ pub async fn get_course_progress(pool: &AppState, course_id: i32, user_id: u32) 
 // Currently, there is really no need for this method in the controller,
 // you can just call fetch from the handler,
 // BUT maybe we'll need this in future for some settings kinda stuff
-pub async fn get_course_extended(state: &AppState, id: i32, user_id: u32) -> anyhow::Result<ExtendedCourseInfo> {
+pub async fn get_course_extended(
+    state: &AppState,
+    id: i32,
+    user_id: u32,
+) -> anyhow::Result<ExtendedCourseInfo> {
     let course = db::coursedb::fetch_course_extended(state, id, user_id).await?;
     Ok(course)
 }
