@@ -145,6 +145,17 @@ pub async fn get_tasks_passed(state: &AppState, course_id: i32, user_id: u32) ->
     Ok(total)
 }
 
+
+pub async fn get_courses_started(state: &AppState, user_id: u32) -> anyhow::Result<Vec<i32>> {
+    let courses_started = db::tasks::fetch_courses_started(&state.pool, user_id).await?;
+    Ok(courses_started)
+}
+
+pub async fn get_courses_completed(state: &AppState, user_id: u32) -> anyhow::Result<Vec<i32>> {
+    let courses_completed = db::tasks::fetch_courses_completed(&state.pool, user_id).await?;
+    Ok(courses_completed)
+}
+
 pub async fn get_task(
     state: &AppState,
     task_id: i32,

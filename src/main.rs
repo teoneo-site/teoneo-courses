@@ -79,14 +79,6 @@ async fn get_gigachat_client() -> anyhow::Result<GigaClient> {
 fn get_router(app_state: AppState) -> Router {
     let app = Router::new()
         .route(
-            "/user/info",
-            axum::routing::get(handlers::users::get_user_info_and_courses),
-        )
-        .route(
-            "/user/stats",
-            axum::routing::get(handlers::users::get_user_stats),
-        )
-        .route(
             "/courses",
             axum::routing::get(handlers::courses::get_all_courses),
         )
@@ -101,6 +93,18 @@ fn get_router(app_state: AppState) -> Router {
         .route(
             "/courses/{course_id}/progress",
             axum::routing::get(handlers::courses::get_course_progress),
+        )
+        .route(
+            "/internal/courses/users/{user_id}",
+            axum::routing::get(handlers::courses::get_user_courses)
+        )
+        .route(
+            "/internal/courses/users/{user_id}/started",
+            axum::routing::get(handlers::courses::get_user_courses_started)
+        )
+        .route(
+            "/internal/courses/users/{user_id}/completed",
+            axum::routing::get(handlers::courses::get_user_courses_completed)
         )
         .route(
             "/courses/{course_id}/modules",

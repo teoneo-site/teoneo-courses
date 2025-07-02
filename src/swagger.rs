@@ -21,12 +21,13 @@ impl utoipa::Modify for SecurityAddon {
 #[derive(OpenApi)]
 #[openapi(
     paths(
-        handlers::users::get_user_info_and_courses,
-        handlers::users::get_user_stats,
         handlers::courses::get_all_courses,
         handlers::courses::get_courses_by_ids,
         handlers::courses::get_course,
         handlers::courses::get_course_progress,
+        handlers::courses::get_user_courses,
+        handlers::courses::get_user_courses_started,
+        handlers::courses::get_user_courses_completed,
         handlers::modules::get_modules_for_course,
         handlers::modules::get_module,
         handlers::courses::add_course_to_favourite,

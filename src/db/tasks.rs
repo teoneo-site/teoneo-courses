@@ -145,6 +145,36 @@ pub async fn fetch_task(
     Ok(task)
 }
 
+
+pub async fn fetch_courses_started(pool: &MySqlPool, user_id: u32) -> anyhow::Result<Vec<i32>> {
+    let rows = sqlx::query!("SELECT DISTINCT t.course_id 
+             FROM task_progress tp
+             JOIN tasks t ON tp.task_id = t.id
+             WHERE tp.user_id = ?", user_id)
+        .fetch_all(pool)
+        .await?;
+
+    Ok(rows.into_iter().map(|element| element.course_id).collect())
+}
+
+pub async fn fetch_courses_completed(pool: &MySqlPool, user_id: u32) -> anyhow::Result<Vec<i32>> {
+    let rows = sqlx::query!("SELECT DISTINCT t.course_id
+        FROM tasks t
+        JOIN task_progress tp ON t.id = tp.task_id
+        WHERE tp.user_id = ? AND tp.status = 'SUCCESS'
+        GROUP BY t.course_id
+        HAVING COUNT(DISTINCT t.id) = (
+            SELECT COUNT(*) 
+            FROM tasks t2 
+            WHERE t2.course_id = t.course_id
+        )", user_id)
+        .fetch_all(pool)
+        .await?;
+
+    Ok(rows.into_iter().map(|element| element.course_id).collect())
+}
+
+
 pub async fn fetch_prompt_details(
     pool: &MySqlPool,
     task_id: i32,

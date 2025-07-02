@@ -41,7 +41,26 @@ pub async fn fetch_courses_by_ids(
     Ok(courses)
 }
 
+pub async fn fetch_user_courses(state: &AppState, user_id: u32) -> anyhow::Result<Vec<i32>> {
+    let rows = sqlx::query!(
+        r#"
+        SELECT c.id AS course_id
+        FROM users u
+        LEFT JOIN user_courses p ON p.user_id = u.id
+        LEFT JOIN courses c ON p.course_id = c.id
+        WHERE u.id = ?
+        "#,
+        user_id
+    )
+    .fetch_all(&state.pool)
+    .await?;
+    let courses = rows
+        .into_iter()
+        .filter_map(|r| r.course_id)
+        .collect();
 
+    Ok(courses)
+}
 
 pub async fn fetch_all_courses(state: &AppState) -> anyhow::Result<Vec<i32>> {
     let courses_ids = sqlx::query_scalar!(

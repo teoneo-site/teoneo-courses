@@ -171,3 +171,57 @@ pub async fn get_favourite_courses(
     });
     Ok((StatusCode::OK, axum::Json(body)).into_response())
 }
+
+
+// Internal
+#[utoipa::path(
+    get,
+    description = "Возвращаются айдишники курсов юзера",
+    path = "/internal/courses/users/{user_id}",
+    params (
+        ("user_id" = String, Path, description = "Айди юзера, курсы которого зафетчить")
+    ),
+    responses(
+        (status = 200, description = "Успешно", body = Vec<i32>),
+        (status = 500, description = "Что-то случилось", body = ErrorResponse)
+    )
+)]
+pub async fn get_user_courses(State(state): State<AppState>, Path(user_id): Path<u32>) -> Result<Response, AppError> {
+    let ids = controllers::courses::get_user_courses(&state, user_id).await?;
+    Ok((StatusCode::OK, axum::Json(ids)).into_response())
+}
+
+// Internal
+#[utoipa::path(
+    get,
+    description = "Возвращаются айдишники курсов юзера",
+    path = "/internal/courses/users/{user_id}/started",
+    params (
+        ("user_id" = String, Path, description = "Айди юзера, курсы которого зафетчить")
+    ),
+    responses(
+        (status = 200, description = "Успешно", body = Vec<i32>),
+        (status = 500, description = "Что-то случилось", body = ErrorResponse)
+    )
+)]
+pub async fn get_user_courses_started(State(state): State<AppState>, Path(user_id): Path<u32>) -> Result<Response, AppError> {
+    let ids = controllers::courses::get_user_courses_started(&state, user_id).await?;
+    Ok((StatusCode::OK, axum::Json(ids)).into_response())
+}
+
+#[utoipa::path(
+    get,
+    description = "Возвращаются айдишники курсов юзера",
+    path = "/internal/courses/users/{user_id}/completed",
+    params (
+        ("user_id" = String, Path, description = "Айди юзера, курсы которого зафетчить")
+    ),
+    responses(
+        (status = 200, description = "Успешно", body = Vec<i32>),
+        (status = 500, description = "Что-то случилось", body = ErrorResponse)
+    )
+)]
+pub async fn get_user_courses_completed(State(state): State<AppState>, Path(user_id): Path<u32>) -> Result<Response, AppError> {
+    let ids = controllers::courses::get_user_courses_completed(&state, user_id).await?;
+    Ok((StatusCode::OK, axum::Json(ids)).into_response())
+}

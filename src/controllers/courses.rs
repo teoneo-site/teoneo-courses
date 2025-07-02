@@ -67,6 +67,21 @@ pub async fn get_favourite_courses(pool: &AppState, user_id: u32) -> anyhow::Res
     Ok(ids)
 }
 
+pub async fn get_user_courses(state: &AppState, user_id: u32) -> anyhow::Result<Vec<i32>> {
+    let ids = db::courses::fetch_user_courses(state, user_id).await?;
+    Ok(ids)
+}
+
+pub async fn get_user_courses_started(state: &AppState, user_id: u32) -> anyhow::Result<Vec<i32>> {
+    let courses_started = clients::tasks::get_started_courses(state, user_id).await?;
+    Ok(courses_started)
+}
+
+pub async fn get_user_courses_completed(state: &AppState, user_id: u32) -> anyhow::Result<Vec<i32>> {
+    let courses_started = clients::tasks::get_completed_courses(state, user_id).await?;
+    Ok(courses_started)
+}
+
 pub async fn get_courses_by_ids(
     state: &AppState,
     ids: Vec<i32>,
