@@ -1,12 +1,12 @@
 use axum::{
     extract::{Path, State},
-    http::{HeaderMap, StatusCode},
+    http::{StatusCode},
     response::{IntoResponse, Response},
 };
 use serde_json::json;
 
 use crate::{
-    common::{self, error::{AppError, ErrorResponse}},
+    common::{error::{AppError, ErrorResponse}, token::OptionalBearerClaims},
     controllers::{self, module::ModuleInfo},
     AppState,
 };
@@ -62,17 +62,11 @@ pub async fn get_modules_for_course(
 )]
 pub async fn get_module(
     State(state): State<AppState>,
-    headers: HeaderMap,
+    auth_token: OptionalBearerClaims,
     Path((course_id, module_id)): Path<(i32, i32)>,
 ) -> Result<Response, AppError> {
-    let authorization_token = headers
-        .get("Authorization")
-        .and_then(|value| value.to_str().ok())
-        .and_then(|s| s.split_whitespace().last())
-        .unwrap_or("");
-
     let is_subscribed_to_course =
-        if let Ok(user_id) = common::token::verify_jwt_token(authorization_token) {
+        if let Some(user_id) = auth_token.0 {
             match controllers::course::verify_ownership(&state, user_id as i32, course_id).await {
                 Ok(_) => true,
                 Err(why) => {

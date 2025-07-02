@@ -1,31 +1,23 @@
 use crate::{
-    common::{self, error::{AppError, ErrorResponse}, token::Claims},
+    common::{self, error::{AppError, ErrorResponse}, token::{AuthHeader, OptionalBearerClaims}},
     controllers::{
         self,
-        course::{BasicCourseInfo, CourseProgress, ExtendedCourseInfo},
+        course::{CourseProgress, ExtendedCourseInfo},
     },
-    db, error_response,
     AppState,
 };
 use axum::{
     extract::{Path, State},
-    http::{HeaderMap, StatusCode},
+    http::{StatusCode},
     response::{IntoResponse, Response},
 };
 use axum_extra::extract::Query;
 use serde::Deserialize;
 use serde_json::json;
-use utoipa::ToSchema;
 
 #[derive(Deserialize)]
 pub struct IdsStruct {
     ids: Vec<i32>,
-}
-
-#[derive(ToSchema)]
-struct CoursesReturnVal {
-    #[schema(example = json!([1, 2, 3]))]
-    data: Vec<i32>,
 }
 
 // PUBLIC GET /courses - Get a list of all available courses (for main page)
@@ -34,7 +26,7 @@ struct CoursesReturnVal {
     description = "Возвращает список публичных курсов (общий)",
     path = "/courses",
     responses(
-        (status = 200, description = "Успешно", body = CoursesReturnVal),
+        (status = 200, description = "Успешно", body = Vec<i32>),
         (status = 500, description = "Что-то случилось", body = ErrorResponse),
     )
 )]
@@ -57,40 +49,22 @@ pub async fn get_all_courses(State(state): State<AppState>) -> Result<Response, 
         ("Authorization" = String, Header, description = "(Опционально) JWT")
     ),
     responses(
-        (status = 200, description = "Успешно", body = Vec<BasicCourseInfo>),
-        (status = 201, description = "(200) Успешно (При наличии токена)", body = Vec<ExtendedCourseInfo>),
+        (status = 200, description = "Успешно", body = Vec<ExtendedCourseInfo>),
         (status = 400, description = "Нет токена в за", body = Vec<ExtendedCourseInfo>),
         (status = 500, description = "Что-то случилось", body = ErrorResponse)
     )
 )]
 pub async fn get_courses_by_ids(
     State(state): State<AppState>,
-    headers: HeaderMap,
+    auth_token: OptionalBearerClaims,
     Query(ids): Query<IdsStruct>,
 ) -> Result<Response, AppError> {
-    let authorization_token = headers
-        .get("Authorization")
-        .and_then(|value| value.to_str().ok())
-        .and_then(|s| s.split_whitespace().last())
-        .unwrap_or("");
-
-    match common::token::verify_jwt_token(authorization_token) {
-        Ok(user_id) => {
-            let courses =
-                controllers::course::get_courses_by_ids_expanded(&state, ids.ids, user_id).await?;
-            let body = json!({
-                "data": courses,
-            });
-            return Ok((StatusCode::OK, axum::Json(body)).into_response());
-        }
-        Err(_) => {
-            let courses = controllers::course::get_courses_by_ids_basic(&state, ids.ids).await?;
-            let body = json!({
-                "data": courses,
-            });
-            return Ok((StatusCode::OK, axum::Json(body)).into_response());
-        }
-    }
+    let courses =
+        controllers::course::get_courses_by_ids(&state, ids.ids, auth_token.0).await?;
+    let body = json!({
+        "data": courses,
+    });
+    return Ok((StatusCode::OK, axum::Json(body)).into_response());
 }
 
 // PUBLIC GET /course/{course_id} - Get info about a single course
@@ -103,41 +77,23 @@ pub async fn get_courses_by_ids(
         ("Authorization" = String, Header, description = "(Опционально) JWT")
     ),
     responses(
-        (status = 200, description = "Успешно", body = BasicCourseInfo),
-        (status = 201, description = "Успешно (При наличии токена)", body = ExtendedCourseInfo),
+        (status = 200, description = "Успешно", body = ExtendedCourseInfo),
         (status = 500, description = "Что-то случилось", body = ErrorResponse)
     )
 )]
 pub async fn get_course(
     State(state): State<AppState>,
-    headers: HeaderMap,
+    auth_token: OptionalBearerClaims,
     Path(course_id): Path<i32>,
 ) -> Result<Response, AppError> {
-    let authorization_token = headers
-        .get("Authorization")
-        .and_then(|value| value.to_str().ok())
-        .and_then(|s| s.split_whitespace().last())
-        .unwrap_or("");
 
-    match common::token::verify_jwt_token(authorization_token) {
-        Ok(user_id) => {
-            let course =
-                controllers::course::get_course_extended(&state, course_id, user_id).await?;
-            let body = json!({
-                "data": course,
-            });
+    let course =
+        controllers::course::get_course(&state, course_id, auth_token.0).await?;
+    let body = json!({
+        "data": course,
+    });
 
-            return Ok((StatusCode::OK, axum::Json(body)).into_response());
-        }
-        Err(_) => {
-            let course = controllers::course::get_course_basic(&state, course_id).await?;
-            let body = json!({
-                "data": course,
-            });
-
-            return Ok((StatusCode::OK, axum::Json(body)).into_response());
-        }
-    }
+    return Ok((StatusCode::OK, axum::Json(body)).into_response());
 }
 
 #[utoipa::path(
@@ -156,9 +112,9 @@ pub async fn get_course(
 pub async fn get_course_progress(
     State(state): State<AppState>,
     Path(course_id): Path<i32>,
-    claims: Claims,
+    auth_token: AuthHeader,
 ) -> Result<Response, AppError> {
-    let user_id = claims.id;
+    let user_id = auth_token.claims.id;
     let progress = controllers::course::get_course_progress(&state, course_id, user_id).await?;
     let body = json!({
         "data": progress,
@@ -183,18 +139,13 @@ pub async fn get_course_progress(
 pub async fn add_course_to_favourite(
     State(state): State<AppState>,
     Path(course_id): Path<i32>,
-    claims: Claims,
+    auth_header: AuthHeader,
 ) -> Result<Response, AppError> {
-    let user_id = claims.id;
+    let user_id = auth_header.claims.id;
     controllers::course::add_course_to_favourite(&state, user_id, course_id).await?;
     Ok((StatusCode::OK).into_response())
 }
 
-#[derive(ToSchema)]
-struct FavouriteResponse {
-    #[schema(example = json!([1, 2, 3]))]
-    data: Vec<i32>,
-}
 #[utoipa::path(
     get,
     description = "Возвращаются айдишники курсов в избранном",
@@ -204,15 +155,15 @@ struct FavouriteResponse {
         ("course_id" = String, Path, description = "Айди курса")
     ),
     responses(
-        (status = 200, description = "Успешно", body = FavouriteResponse),
+        (status = 200, description = "Успешно", body = Vec<i32>),
         (status = 500, description = "Что-то случилось", body = ErrorResponse)
     )
 )]
 pub async fn get_favourite_courses(
     State(state): State<AppState>,
-    claims: Claims,
+    auth_header: AuthHeader,
 ) -> Result<Response, AppError> {
-    let user_id = claims.id;
+    let user_id = auth_header.claims.id;
 
     let ids = controllers::course::get_favourite_courses(&state, user_id).await?;
     let body = json!({

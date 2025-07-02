@@ -1,5 +1,4 @@
 use anyhow::anyhow;
-use redis::Commands;
 use sqlx::Row;
 
 use crate::controllers;
@@ -8,14 +7,6 @@ use crate::controllers::user::UserInfoFull;
 use crate::AppState;
 
 pub async fn get_user_info(state: &AppState, user_id: u32) -> anyhow::Result<UserInfo> {
-    let cache_key = format!("user:{}", user_id);
-    if let Ok(mut conn) = state.redis.get() {
-        if let Ok(val) = conn.get::<&str, String>(&cache_key) {
-            if let Ok(user_info_struct) = serde_json::from_str::<UserInfo>(&val) {
-                return Ok(user_info_struct);
-            }
-        }
-    }
 
     let query = "SELECT 
         u.username, 
@@ -31,22 +22,10 @@ pub async fn get_user_info(state: &AppState, user_id: u32) -> anyhow::Result<Use
     userinfo.username = row.0;
     userinfo.email = row.1;
 
-    if let Ok(mut conn) = state.redis.get() {
-        let result_str = serde_json::to_string(&userinfo).unwrap(); // Should not panic
-        conn.set_ex(cache_key, result_str, 300).unwrap_or(()); // Don't care if it fails
-    }
     Ok(userinfo)
 }
 
 pub async fn get_user_info_all(state: &AppState, user_id: u32) -> anyhow::Result<UserInfoFull> {
-    let cache_key = format!("user:info:all:{}", user_id);
-    if let Ok(mut conn) = state.redis.get() {
-        if let Ok(val) = conn.get::<&str, String>(&cache_key) {
-            if let Ok(info_struct) = serde_json::from_str::<UserInfoFull>(&val) {
-                return Ok(info_struct);
-            }
-        }
-    }
 
     let query = "SELECT 
         u.username, 
@@ -81,23 +60,10 @@ pub async fn get_user_info_all(state: &AppState, user_id: u32) -> anyhow::Result
     }
     userinfo.courses = courses;
 
-    if let Ok(mut conn) = state.redis.get() {
-        let result_str = serde_json::to_string(&userinfo).unwrap(); // Should not panic
-        conn.set_ex(cache_key, result_str, 300).unwrap_or(());
-    }
-
     Ok(userinfo)
 }
 
 pub async fn get_courses_info(state: &AppState, user_id: u32) -> anyhow::Result<Vec<i32>> {
-    let cache_key = format!("user:info:courses:{}", user_id);
-    if let Ok(mut conn) = state.redis.get() {
-        if let Ok(val) = conn.get::<&str, String>(&cache_key) {
-            if let Ok(courses_info_struct) = serde_json::from_str::<Vec<i32>>(&val) {
-                return Ok(courses_info_struct);
-            }
-        }
-    }
 
     let query = "SELECT 
         c.id AS course_id
@@ -117,11 +83,6 @@ pub async fn get_courses_info(state: &AppState, user_id: u32) -> anyhow::Result<
             courses.push(course_id);
         }
     }
-
-    if let Ok(mut conn) = state.redis.get() {
-        let result_str = serde_json::to_string(&courses).unwrap();
-        conn.set_ex(cache_key, result_str, 120).unwrap_or(());
-    }
     Ok(courses)
 }
 
@@ -129,14 +90,6 @@ pub async fn get_user_stats(
     state: &AppState,
     user_id: u32,
 ) -> anyhow::Result<controllers::user::UserStats> {
-    let cache_key = format!("user:stats:{}", user_id);
-    if let Ok(mut conn) = state.redis.get() {
-        if let Ok(val) = conn.get::<&str, String>(&cache_key) {
-            if let Ok(stats_info) = serde_json::from_str::<controllers::user::UserStats>(&val) {
-                return Ok(stats_info);
-            }
-        }
-    }
 
     let query = "
         SELECT 
@@ -168,7 +121,7 @@ pub async fn get_user_stats(
                  SELECT COUNT(*) 
                  FROM modules m2 
                  WHERE m2.course_id = m.course_id
-             )) AS courses_completed
+             ))s AS courses_completed
     ";
     let row = sqlx::query_as::<_, (i64, i64, Option<i64>)>(query)
         .bind(user_id)
@@ -182,9 +135,5 @@ pub async fn get_user_stats(
         courses_started: row.1,
         courses_completed: row.2.unwrap_or(0),
     };
-    if let Ok(mut conn) = state.redis.get() {
-        let result_str = serde_json::to_string(&info).unwrap();
-        conn.set_ex(cache_key, result_str, 120).unwrap_or(());
-    }
     Ok(info)
 }

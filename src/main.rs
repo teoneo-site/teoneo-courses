@@ -28,7 +28,7 @@ mod swagger;
 struct AppState {
     pool: Pool<MySql>,
     ai: GigaClient,
-    redis: r2d2::Pool<redis::Client>,
+    // redis: r2d2::Pool<redis::Client>,
 }
 
 fn internal_server_error_handler(err: Box<dyn Any + Send + 'static>) -> Response {
@@ -60,11 +60,11 @@ async fn get_db_pool() -> anyhow::Result<Pool<MySql>> {
     Ok(mysql_pool)
 }
 
-async fn get_redis_pool() -> anyhow::Result<r2d2::Pool<redis::Client>> {
-    let client = redis::Client::open(env::var("REDIS_URL").unwrap())?;
-    let pool = r2d2::Pool::builder().build(client).unwrap();
-    Ok(pool)
-}
+// async fn get_redis_pool() -> anyhow::Result<r2d2::Pool<redis::Client>> {
+//     let client = redis::Client::open(env::var("REDIS_URL").unwrap())?;
+//     let pool = r2d2::Pool::builder().build(client).unwrap();
+//     Ok(pool)
+// }
 
 async fn get_gigachat_client() -> anyhow::Result<GigaClient> {
     let config: MessageConfig = MessageConfigBuilder::new().set_model("GigaChat").build();
@@ -168,7 +168,7 @@ async fn main() {
         ai: get_gigachat_client()
             .await
             .expect("Could not connect to gigachat"),
-        redis: get_redis_pool().await.expect("Could not connect to redis"),
+        // redis: get_redis_pool().await.expect("Could not connect to redis"),
     };
     let router = get_router(app_state);
 

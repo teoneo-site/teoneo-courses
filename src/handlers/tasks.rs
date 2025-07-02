@@ -13,7 +13,7 @@ use serde_json::json;
 use crate::{
     common::{
         error::{AppError, ErrorResponse, ErrorTypes},
-        token::Claims,
+        token::{AuthHeader},
     },
     controllers::{
         self,
@@ -21,7 +21,6 @@ use crate::{
         task::{process_prompt_task, Task, TaskShortInfo, TaskType},
     },
     db, error_response,
-    handlers::{self},
     AppState,
 };
 
@@ -50,12 +49,12 @@ pub struct StatusQueryOptional {
 pub async fn get_tasks_for_module(
     State(state): State<AppState>,
     OptionalQuery(query_data): OptionalQuery<StatusQueryOptional>,
-    claims: Claims,
+    auth_header: AuthHeader,
     Path((course_id, module_id)): Path<(i32, i32)>,
 ) -> Result<Response, AppError> {
-    let user_id = claims.id as i32;
+    let user_id = auth_header.claims.id as i32;
     if let Err(why) =
-        controllers::course::verify_ownership(&state, claims.id as i32, course_id).await
+        controllers::course::verify_ownership(&state, auth_header.claims.id as i32, course_id).await
     {
         tracing::error!("Could not verify course ownership {}", why);
 
@@ -109,12 +108,12 @@ pub struct ProgressQueryOptional {
 pub async fn get_task(
     State(state): State<AppState>,
     OptionalQuery(query_data): OptionalQuery<ProgressQueryOptional>,
-    claims: Claims,
+    auth_header: AuthHeader,
     Path((course_id, module_id, task_id)): Path<(i32, i32, i32)>,
 ) -> Result<Response, AppError> {
-    let user_id = claims.id as i32;
+    let user_id = auth_header.claims.id as i32;
     if let Err(why) =
-        controllers::course::verify_ownership(&state, claims.id as i32, course_id).await
+        controllers::course::verify_ownership(&state, auth_header.claims.id as i32, course_id).await
     {
         // Does not own the course
         tracing::error!("Could not verify course ownership {}", why);
@@ -162,11 +161,11 @@ pub struct SubmitPayload {
 )]
 pub async fn submit_task(
     State(state): State<AppState>,
-    claims: Claims,
+    auth_header: AuthHeader,
     Path((course_id, _module_id, task_id)): Path<(i32, i32, i32)>, // We dont really need module_id tho, just course (not necessary and)
     Json(user_answers): Json<serde_json::Value>,
 ) -> Result<Response, AppError> {
-    let user_id = claims.id;
+    let user_id = auth_header.claims.id;
     if let Err(why) = controllers::course::verify_ownership(&state, user_id as i32, course_id).await
     {
         // Does not own the course
@@ -185,7 +184,7 @@ pub async fn submit_task(
     // Frontend can query status at this point
     controllers::progress::update_or_insert_status(
         &state,
-        claims.id,
+        user_id,
         task_id,
         ProgressStatus::Eval,
         "".to_string(),
@@ -199,7 +198,7 @@ pub async fn submit_task(
         TaskType::Quiz | TaskType::Match => {
             controllers::task::submit_quiz_task(
                 &state,
-                claims.id,
+                user_id,
                 task_id,
                 task_type,
                 user_answers,
@@ -209,7 +208,7 @@ pub async fn submit_task(
         }
         TaskType::Prompt => {
             let (attempts, max_attemps) =
-                db::progressdb::get_prompt_task_attemps(&state.pool, claims.id, task_id) // Task is supposed to be prompt 100% at this point
+                db::progressdb::get_prompt_task_attemps(&state.pool, user_id, task_id) // Task is supposed to be prompt 100% at this point
                     .await
                     .unwrap(); // So unwrap() should not panic
             if attempts >= max_attemps {
@@ -221,7 +220,7 @@ pub async fn submit_task(
                 ));
             }
 
-            if let Err(why) = process_prompt_task(state, claims.id, task_id, user_answers).await {
+            if let Err(why) = process_prompt_task(state, user_id, task_id, user_answers).await {
                 tracing::error!("Error submiting prompt task: {}", why);
 
                 return Ok(error_response!(
@@ -269,12 +268,12 @@ pub async fn submit_task(
 )]
 pub async fn task_progress(
     State(state): State<AppState>,
-    claims: Claims,
+    auth_header: AuthHeader,
     Path((course_id, _module_id, task_id)): Path<(i32, i32, i32)>,
 ) -> Result<Response, AppError> {
-    let user_id = claims.id;
+    let user_id = auth_header.claims.id;
     if let Err(why) =
-        controllers::course::verify_ownership(&state, claims.id as i32, course_id).await
+        controllers::course::verify_ownership(&state, user_id as i32, course_id).await
     {
         // Does not own the course
         tracing::error!("Could not verify course ownership {}", why);

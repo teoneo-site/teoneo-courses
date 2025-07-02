@@ -1,81 +1,33 @@
 use serde::{Deserialize, Serialize};
+use sqlx::prelude::FromRow;
 use utoipa::ToSchema;
 
 use crate::{db, AppState};
-#[derive(Serialize, Deserialize, ToSchema)]
+#[derive(Serialize, Deserialize, ToSchema, FromRow)]
 pub struct BasicCourseInfo {
     pub id: i32,
     pub title: String,
     pub brief_description: String,
     pub full_description: String,
-    pub tags: Vec<String>,
+    pub tags: String,
     pub picture_url: String,
     pub price: f64,
 }
 
-impl BasicCourseInfo {
-    pub fn new(
-        id: i32,
-        title: String,
-        brief_description: String,
-        full_description: String,
-        tags: Vec<String>,
-        picture_url: String,
-        price: f64,
-    ) -> Self {
-        Self {
-            id,
-            title,
-            brief_description,
-            full_description,
-            tags,
-            picture_url,
-            price,
-        }
-    }
-}
 
-#[derive(Serialize, Deserialize, Clone, ToSchema)]
+#[derive(Serialize, Deserialize, Clone, ToSchema, FromRow)]
 pub struct ExtendedCourseInfo {
     pub id: i32,
     pub title: String,
     pub brief_description: String,
     pub full_description: String,
-    pub tags: Vec<String>,
+    pub tags: String,
     pub picture_url: String,
     pub price: f64,
     pub has_course: bool,
     pub tasks_passed: Option<i32>,
     pub tasks_total: Option<i32>,
 }
-impl ExtendedCourseInfo {
-    pub fn new(
-        id: i32,
-        title: String,
-        brief_description: String,
-        full_description: String,
-        tags: Vec<String>,
-        picture_url: String,
-        price: f64,
-        has_course: bool,
-        tasks_passed: Option<i32>,
-        tasks_total: Option<i32>,
-    ) -> Self {
-        Self {
-            id,
-            title,
-            brief_description,
-            full_description,
-            tags,
-            picture_url,
-            price,
-            has_course,
-            tasks_passed,
-            tasks_total,
-        }
-    }
-}
-
 #[derive(Serialize, Deserialize)]
 pub struct ShortCourseInfo {
     course_id: i32,
@@ -132,22 +84,15 @@ pub async fn get_favourite_courses(pool: &AppState, user_id: u32) -> anyhow::Res
     Ok(ids)
 }
 
-pub async fn get_courses_by_ids_expanded(
+pub async fn get_courses_by_ids(
     pool: &AppState,
     ids: Vec<i32>,
-    user_id: u32,
+    user_id: Option<u32>,
 ) -> anyhow::Result<Vec<ExtendedCourseInfo>> {
-    let courses = db::coursedb::fetch_courses_by_ids_expanded(pool, ids, user_id).await?;
+    let courses = db::coursedb::fetch_courses_by_ids(pool, ids, user_id).await?;
     Ok(courses)
 }
 
-pub async fn get_courses_by_ids_basic(
-    pool: &AppState,
-    ids: Vec<i32>,
-) -> anyhow::Result<Vec<BasicCourseInfo>> {
-    let courses = db::coursedb::fetch_courses_by_ids_basic(pool, ids).await?;
-    Ok(courses)
-}
 
 pub async fn get_course_progress(
     pool: &AppState,
@@ -161,18 +106,15 @@ pub async fn get_course_progress(
 // Currently, there is really no need for this method in the controller,
 // you can just call fetch from the handler,
 // BUT maybe we'll need this in future for some settings kinda stuff
-pub async fn get_course_extended(
+pub async fn get_course(
     state: &AppState,
     id: i32,
-    user_id: u32,
+    user_id: Option<u32>,
 ) -> anyhow::Result<ExtendedCourseInfo> {
-    let course = db::coursedb::fetch_course_extended(state, id, user_id).await?;
+    let course = db::coursedb::fetch_course(state, id, user_id).await?;
     Ok(course)
 }
-pub async fn get_course_basic(state: &AppState, id: i32) -> anyhow::Result<BasicCourseInfo> {
-    let course = db::coursedb::fetch_course_basic(state, id).await?;
-    Ok(course)
-}
+
 
 pub async fn verify_ownership(
     state: &AppState,

@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::{
-    common::{error::{AppError, ErrorResponse}, token::Claims},
+    common::{error::{AppError, ErrorResponse}, token::AuthHeader},
     controllers::{
         self,
         user::{UserInfo, UserInfoFull, UserStats},
@@ -37,10 +37,6 @@ async fn handle_result<T: Serialize>(
     Ok((StatusCode::OK, axum::Json(json_obj)).into_response())
 }
 
-#[derive(ToSchema)]
-struct RespForUtoipa {
-    data: Vec<i32>,
-}
 
 #[utoipa::path(
     get,
@@ -53,16 +49,16 @@ struct RespForUtoipa {
     responses(
         (status = 200, description = "При значении all", body = UserInfoFull),
         (status = 201, description = "(200) При значении user", body = UserInfo),
-        (status = 203, description = "(200) При значении courses", body = RespForUtoipa),
+        (status = 203, description = "(200) При значении courses", body = Vec<i32>),
         (status = 500, description = "Что-то случилось", body = ErrorResponse),
     )
 )]
 pub async fn get_user_info_and_courses(
     State(state): State<AppState>,
-    claims: Claims,
+    auth_header: AuthHeader,
     Query(value): Query<UserInfoQuery>,
 ) -> Result<Response, AppError> {
-    let user_id = claims.id;
+    let user_id = auth_header.claims.id;
     match value.value {
         ValueInfo::All => {
             handle_result(controllers::user::get_user_info_all(&state, user_id)).await
@@ -88,9 +84,9 @@ pub async fn get_user_info_and_courses(
 )]
 pub async fn get_user_stats(
     State(state): State<AppState>,
-    claims: Claims,
+    auth_header: AuthHeader,
 ) -> Result<Response, AppError> {
-    let user_id = claims.id;
+    let user_id = auth_header.claims.id;
     let stats = controllers::user::get_user_stats(&state, user_id).await?;
     Ok((StatusCode::OK, axum::Json(stats)).into_response())
 }

@@ -1,112 +1,17 @@
-use redis::Commands;
 use sqlx::MySqlPool;
 use sqlx::Row;
 
-use crate::controllers::progress::ProgressStatus;
 use crate::controllers::task::Task;
 use crate::controllers::task::TaskShortInfo;
 use crate::controllers::task::TaskType;
 use crate::AppState;
 
-impl<'r> sqlx::FromRow<'r, sqlx::mysql::MySqlRow> for TaskShortInfo {
-    fn from_row(row: &'r sqlx::mysql::MySqlRow) -> Result<Self, sqlx::Error> {
-        Ok(Self {
-            id: row.try_get("id")?,
-            module_id: row.try_get("module_id")?,
-            title: row.try_get("title")?,
-            task_type: row.try_get::<String, _>("type")?.into(),
-            status: row
-                .try_get::<Option<String>, _>("status")
-                .map(|opt| opt.map(Into::into))
-                .map_err(|_| ())
-                .ok()
-                .flatten(),
-        })
-    }
-}
-
-impl<'r> sqlx::FromRow<'r, sqlx::mysql::MySqlRow> for Task {
-    fn from_row(row: &'r sqlx::mysql::MySqlRow) -> Result<Self, sqlx::Error> {
-        let id: i32 = row.try_get("id")?;
-        let module_id: i32 = row.try_get("module_id")?;
-        let title: String = row.try_get("title")?;
-        let task_type: TaskType = row.try_get::<String, _>("type")?.into();
-        let status: Option<ProgressStatus> = row
-            .try_get::<Option<String>, _>("status")
-            .map(|opt| opt.map(Into::into))
-            .map_err(|_| ())
-            .ok()
-            .flatten();
-        let score: Option<f32> = row
-            .try_get::<Option<f32>, _>("score")
-            .map_err(|_| ())
-            .ok()
-            .flatten();
-
-        let content = match task_type {
-            TaskType::Quiz => {
-                let question: String = row.try_get("qquestion")?;
-                println!("here");
-                let possible_answers: String = row.try_get("possible_answers")?;
-                let is_multiple: bool = row.try_get("is_multiple")?;
-
-                serde_json::json!({
-                    "question": question,
-                    "possible_answers": possible_answers.split(';').collect::<Vec<&str>>(),
-                    "is_multiple": is_multiple,
-                })
-            }
-            TaskType::Lecture => {
-                let text: String = row.try_get("text")?;
-                serde_json::json!({
-                    "text": text,
-                })
-            }
-            TaskType::Match => {
-                let question: String = row.try_get("question")?;
-                let left_items: String = row.try_get("left_items")?;
-                let right_items: String = row.try_get("right_items")?;
-
-                serde_json::json!({
-                    "question": question,
-                    "left_items": left_items.split(';').collect::<Vec<&str>>(),
-                    "right_items": right_items.split(';').collect::<Vec<&str>>(),
-                })
-            }
-            TaskType::Prompt => {
-                let question: String = row.try_get("pquestion")?;
-                let max_attempts: i32 = row.try_get("max_attempts")?;
-                serde_json::json!({
-                    "question": question,
-                    "max_attempts": max_attempts
-                })
-            }
-        };
-        Ok(Self {
-            id,
-            module_id,
-            title,
-            task_type,
-            content,
-            status,
-            score,
-        })
-    }
-}
 
 pub async fn fetch_tasks_for_module(
     state: &AppState,
     module_id: i32,
     user_id: Option<i32>,
 ) -> anyhow::Result<Vec<TaskShortInfo>> {
-    let cache_key = format!("module:{}:tasks:all", module_id);
-    if let Ok(mut conn) = state.redis.get() {
-        if let Ok(val) = conn.get::<&str, String>(&cache_key) {
-            if let Ok(parsed_tasks) = serde_json::from_str::<Vec<TaskShortInfo>>(&val) {
-                return Ok(parsed_tasks);
-            }
-        }
-    }
     let tasks = if let Some(user_id) = user_id {
         sqlx::query_as::<_, TaskShortInfo>("SELECT t.id, t.module_id, t.title, t.type, tp.status AS status FROM tasks t LEFT JOIN task_progress tp ON tp.task_id = t.id AND tp.user_id = ? WHERE t.module_id = ?")
         .bind(user_id)
@@ -121,11 +26,6 @@ pub async fn fetch_tasks_for_module(
         .fetch_all(&state.pool)
         .await?
     };
-
-    if let Ok(mut conn) = state.redis.get() {
-        let result_str = serde_json::to_string(&tasks).unwrap(); // Should not panic
-        let _: () = conn.set_ex(&cache_key, result_str, 3600).unwrap_or(());
-    }
     Ok(tasks)
 }
 
@@ -172,15 +72,6 @@ pub async fn fetch_task(
     task_id: i32,
     user_id: Option<i32>,
 ) -> anyhow::Result<Task> {
-    let cache_key = format!("task:{}", task_id);
-    if let Ok(mut conn) = state.redis.get() {
-        if let Ok(val) = conn.get::<&str, String>(&cache_key) {
-            // Cache is up to date (in terms of progress), becase we delete key, when updating progress
-            if let Ok(parsed_task) = serde_json::from_str(&val) {
-                return Ok(parsed_task);
-            }
-        }
-    }
 
     let task = if let Some(user_id) = user_id {
         sqlx::query_as::<_, Task>(
@@ -221,12 +112,6 @@ pub async fn fetch_task(
         .fetch_one(&state.pool)
         .await?
     };
-
-    if let Ok(mut conn) = state.redis.get() {
-        let task_str = serde_json::to_string(&task).unwrap(); // Should not panic
-        let _: () = conn.set_ex(&cache_key, task_str, 3600).unwrap_or(());
-    }
-
     Ok(task)
 }
 

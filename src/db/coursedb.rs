@@ -1,122 +1,21 @@
 use crate::controllers::course::{BasicCourseInfo, CourseProgress, ExtendedCourseInfo};
 use crate::AppState;
-use redis::Commands;
+
 use sqlx::Row;
 
-impl<'r> sqlx::FromRow<'r, sqlx::mysql::MySqlRow> for BasicCourseInfo {
-    fn from_row(row: &'r sqlx::mysql::MySqlRow) -> Result<Self, sqlx::Error> {
-        let tags_str: String = row.try_get("tags")?;
-        Ok(Self {
-            id: row.try_get("id")?,
-            title: row.try_get("title")?,
-            brief_description: row.try_get("brief_description")?,
-            full_description: row.try_get("full_description")?,
-            tags: tags_str.split(',').map(|s| s.trim().to_owned()).collect(),
-            picture_url: row.try_get("picture_url")?,
-            price: row.try_get("price")?,
-        })
-    }
-}
-impl<'r> sqlx::FromRow<'r, sqlx::mysql::MySqlRow> for ExtendedCourseInfo {
-    fn from_row(row: &'r sqlx::mysql::MySqlRow) -> Result<Self, sqlx::Error> {
-        let has_course: bool = row.try_get("has_course")?;
-        let tasks_passed: Option<i32> = if has_course {
-            row.try_get("tasks_passed")?
-        } else {
-            None
-        };
-        let tasks_total: Option<i32> = if has_course {
-            row.try_get("tasks_total")?
-        } else {
-            None
-        };
-        Ok(Self {
-            id: row.try_get("id")?,
-            title: row.try_get("title")?,
-            brief_description: row.try_get("brief_description")?,
-            full_description: row.try_get("full_description")?,
-            tags: row
-                .try_get::<String, _>("tags")?
-                .split(",")
-                .map(|str| str.to_owned())
-                .collect::<Vec<String>>(),
-            picture_url: row.try_get("picture_url")?,
-            price: row.try_get("price")?,
-            has_course,
-            tasks_passed,
-            tasks_total,
-        })
-    }
-}
 
-pub async fn fetch_courses_by_ids_basic(
+pub async fn fetch_courses_by_ids(
     state: &AppState,
     ids: Vec<i32>,
-) -> anyhow::Result<Vec<BasicCourseInfo>> {
-    let mut courses = Vec::new();
-    let mut ids_to_fetch = Vec::new();
-
-    if let Ok(mut conn) = state.redis.get() {
-        for id in &ids {
-            if let Ok(val) = conn.get::<String, String>(format!("course:{}", id)) {
-                if let Ok(parsed_course) = serde_json::from_str::<BasicCourseInfo>(&val) {
-                    courses.push(parsed_course);
-                    continue;
-                }
-            }
-            ids_to_fetch.push(*id);
-        }
-    }
-
-    if !ids_to_fetch.is_empty() {
-        let placeholders: Vec<String> = ids_to_fetch.iter().map(|_| "?".to_string()).collect();
-        let query = format!(
-            "SELECT id, title, brief_description, full_description, tags, picture_url, price FROM courses WHERE id IN ({})",
-            placeholders.join(", ")
-        );
-        let mut query_builder = sqlx::query_as::<_, BasicCourseInfo>(&query);
-        for id in &ids_to_fetch {
-            query_builder = query_builder.bind(id);
-        }
-        courses = query_builder.fetch_all(&state.pool).await?;
-
-        if let Ok(mut conn) = state.redis.get() {
-            for course in courses.iter() {
-                let course_str = serde_json::to_string(&course).unwrap(); // Isn't supposed to fail
-                conn.set_ex(format!("course:{}", course.id), course_str, 3600)
-                    .unwrap_or(());
-            }
-        }
-    }
-
-    Ok(courses)
-}
-
-pub async fn fetch_courses_by_ids_expanded(
-    state: &AppState,
-    ids: Vec<i32>,
-    user_id: u32,
+    user_id: Option<u32>,
 ) -> anyhow::Result<Vec<ExtendedCourseInfo>> {
-    let mut courses: Vec<ExtendedCourseInfo> = Vec::new();
-    let mut ids_to_fetch = Vec::new();
-
-    if let Ok(mut conn) = state.redis.get() {
-        for id in &ids {
-            if let Ok(val) =
-                conn.get::<String, String>(format!("exp-course:{}:user:{}", id, user_id))
-            {
-                if let Ok(parsed_course) = serde_json::from_str::<ExtendedCourseInfo>(&val) {
-                    courses.push(parsed_course);
-                    continue;
-                }
-            }
-            ids_to_fetch.push(*id);
-        }
+    if ids.is_empty() {
+        return Ok(Vec::new());
     }
 
-    if !ids_to_fetch.is_empty() {
-        let placeholders: Vec<String> = ids_to_fetch.iter().map(|_| "?".to_string()).collect();
-        let query = format!(
+    let placeholders: Vec<String> = ids.iter().map(|_| "?".to_string()).collect();
+    let query = if user_id.is_some() {
+        format!(
             r#"
             SELECT 
                 c.id,
@@ -147,70 +46,58 @@ pub async fn fetch_courses_by_ids_expanded(
             WHERE c.id IN ({})
             "#,
             placeholders.join(", ")
-        );
+        )
+    } else {
+        format!(
+            r#"
+            SELECT 
+                c.id,
+                c.title,
+                c.brief_description,
+                c.full_description,
+                c.tags,
+                c.picture_url,
+                c.price,
+                false AS has_course,
+                NULL AS tasks_total,
+                NULL AS tasks_passed
+            FROM courses c
+            WHERE c.id IN ({})
+            "#,
+            placeholders.join(", ")
+        )
+    };
 
-        let mut query_builder = sqlx::query_as::<_, ExtendedCourseInfo>(&query)
-            .bind(user_id)
-            .bind(user_id);
-
-        for id in &ids_to_fetch {
-            query_builder = query_builder.bind(id);
-        }
-
-        courses = query_builder.fetch_all(&state.pool).await?;
-
-        if let Ok(mut conn) = state.redis.get() {
-            for course in courses.iter() {
-                let course_str = serde_json::to_string(&course).unwrap(); // Isn't supposed to fail
-                conn.set_ex(
-                    format!("exp-course:{}:user:{}", course.id, user_id),
-                    course_str,
-                    3600,
-                )
-                .unwrap_or(());
-            }
-        }
+    let mut query_builder = sqlx::query_as::<_, ExtendedCourseInfo>(&query);
+    if let Some(uid) = user_id {
+        query_builder = query_builder.bind(uid).bind(uid);
     }
 
+    for id in &ids {
+        query_builder = query_builder.bind(id);
+    }
+
+    let courses = query_builder.fetch_all(&state.pool).await?;
     Ok(courses)
 }
 
+
+
 pub async fn fetch_all_courses(state: &AppState) -> anyhow::Result<Vec<i32>> {
-    if let Ok(mut conn) = state.redis.get() {
-        if let Ok(val) = conn.get::<&str, String>("courses:all") {
-            // If courses are cached
-            if let Ok(parsed_vec) = serde_json::from_str::<Vec<i32>>(&val) {
-                // Get them from redis
-                return Ok(parsed_vec);
-            }
-        }
-    }
     let courses_ids: Vec<i32> = sqlx::query_scalar!("SELECT id FROM courses") // Todo: Pagination with LIMIT
         .fetch_all(&state.pool)
         .await?;
-
-    // If courses aren't cached -> cache them for an hour
-    if let Ok(mut conn) = state.redis.get() {
-        let result_str = serde_json::to_string(&courses_ids).unwrap(); // Isn't supposed to fail
-        conn.set_ex("courses:all", result_str, 3600).unwrap_or(()); // Ignore error, because we dont really care, can't afford to break when cant set smth
-    }
     Ok(courses_ids)
 }
 
-pub async fn fetch_course_extended(
+pub async fn fetch_course(
     state: &AppState,
     id: i32,
-    user_id: u32,
+    user_id: Option<u32>,
 ) -> anyhow::Result<ExtendedCourseInfo> {
-    if let Ok(mut conn) = state.redis.get() {
-        if let Ok(val) = conn.get::<String, String>(format!("course:{}", id)) {
-            if let Ok(parsed_course) = serde_json::from_str::<ExtendedCourseInfo>(&val) {
-                return Ok(parsed_course);
-            }
-        }
-    }
-
-    let query = "SELECT 
+    let query = if user_id.is_some() {
+        r#"
+        SELECT 
             c.id,
             c.title,
             c.brief_description,
@@ -236,65 +123,48 @@ pub async fn fetch_course_extended(
                 WHERE tp.user_id = ? AND tp.status = 'SUCCESS' AND m.course_id = c.id
             ) AS tasks_passed
         FROM courses c
-        WHERE c.id = ?";
-    let course = sqlx::query_as::<_, ExtendedCourseInfo>(query)
-        .bind(user_id)
-        .bind(user_id)
-        .bind(id)
-        .fetch_one(&state.pool)
-        .await?;
+        WHERE c.id = ?
+        "#
+    } else {
+        r#"
+        SELECT 
+            c.id,
+            c.title,
+            c.brief_description,
+            c.full_description,
+            c.tags,
+            c.picture_url,
+            c.price,
+            false AS has_course,
+            NULL AS tasks_total,
+            NULL AS tasks_passed
+        FROM courses c
+        WHERE c.id = ?
+        "#
+    };
 
-    if let Ok(mut conn) = state.redis.get() {
-        let course_str = serde_json::to_string(&course).unwrap(); // Isn't supposed to fail
-        conn.set_ex(format!("course:{}", id), course_str, 3600)
-            .unwrap_or(());
+    let mut query_builder = sqlx::query_as::<_, ExtendedCourseInfo>(query);
+
+    if let Some(uid) = user_id {
+        query_builder = query_builder.bind(uid).bind(uid);
     }
+
+    query_builder = query_builder.bind(id);
+
+    let course = query_builder.fetch_one(&state.pool).await?;
 
     Ok(course)
 }
 
-pub async fn fetch_course_basic(state: &AppState, id: i32) -> anyhow::Result<BasicCourseInfo> {
-    if let Ok(mut conn) = state.redis.get() {
-        if let Ok(val) = conn.get::<String, String>(format!("course:{}", id)) {
-            if let Ok(parsed_course) = serde_json::from_str::<BasicCourseInfo>(&val) {
-                return Ok(parsed_course);
-            }
-        }
-    }
-
-    let course = sqlx::query_as::<_, BasicCourseInfo>("SELECT id, title, brief_description, full_description, tags, picture_url, price FROM courses WHERE id = ?")
-        .bind(id)
-        .fetch_one(&state.pool)
-        .await?;
-
-    if let Ok(mut conn) = state.redis.get() {
-        let course_str = serde_json::to_string(&course).unwrap(); // Isn't supposed to fail
-        conn.set_ex(format!("course:{}", id), course_str, 3600)
-            .unwrap_or(());
-    }
-
-    Ok(course)
-}
 
 pub async fn validate_course_ownership(
     state: &AppState,
     user_id: i32,
     course_id: i32,
 ) -> anyhow::Result<()> {
-    let cache_key = format!("ownership:{}:{}", user_id, course_id);
-    if let Ok(mut conn) = state.redis.get() {
-        if let Ok(true) = conn.exists(&cache_key) {
-            return Ok(());
-        }
-    }
-
     sqlx::query!("SELECT * FROM user_courses WHERE user_id = ? AND course_id = ? LIMIT 1", user_id, course_id) // Limit 1 for optimization
         .fetch_one(&state.pool)
-        .await?; // returns Err(RowNotFound) if no rows
-
-    if let Ok(mut conn) = state.redis.get() {
-        conn.set_ex(&cache_key, "has", 300).unwrap_or(()); // Set any value, which means the row will be there
-    }
+        .await?; // returns Err(RowNotFound) if no row
     Ok(()) // At this point there is a row 100% which proves ownership
 }
 

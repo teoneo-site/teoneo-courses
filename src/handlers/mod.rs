@@ -1,7 +1,3 @@
-use std::fmt::Display;
-
-use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
 
 // Types of handlers
 pub mod courses;

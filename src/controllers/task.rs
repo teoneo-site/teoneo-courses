@@ -1,6 +1,7 @@
 use std::fmt::Display;
 
 use serde::{Deserialize, Serialize};
+use sqlx::prelude::FromRow;
 use utoipa::ToSchema;
 
 use crate::{db, AppState};
@@ -68,70 +69,32 @@ impl From<String> for TaskType {
     }
 }
 
-#[derive(Serialize, Deserialize, ToSchema)]
+#[derive(Serialize, Deserialize, ToSchema, FromRow)]
 pub struct TaskShortInfo {
     pub id: i32,
     pub module_id: i32,
     pub title: String,
     #[serde(rename = "type")]
-    pub task_type: TaskType,
+    pub task_type: String, // Task Type
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub status: Option<ProgressStatus>,
+    pub status: Option<String>, // Progress Status
 }
 
-impl TaskShortInfo {
-    pub fn new(
-        id: i32,
-        module_id: i32,
-        title: String,
-        task_type: TaskType,
-        status: Option<ProgressStatus>,
-    ) -> Self {
-        Self {
-            id,
-            module_id,
-            title,
-            task_type,
-            status,
-        }
-    }
-}
 
-#[derive(Serialize, Deserialize, ToSchema)]
+#[derive(Serialize, Deserialize, ToSchema, FromRow)]
 pub struct Task {
     pub id: i32,
     pub module_id: i32,
     pub title: String,
     #[serde(rename = "type")]
-    pub task_type: TaskType,
+    pub task_type: String, // Task Type
     pub content: serde_json::Value, // содержимое задания
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub status: Option<ProgressStatus>,
+    pub status: Option<String>, // Progress Status
     #[serde(skip_serializing_if = "Option::is_none")]
     pub score: Option<f32>,
 }
 
-impl Task {
-    pub fn new(
-        id: i32,
-        module_id: i32,
-        title: String,
-        task_type: TaskType,
-        content: serde_json::Value,
-        status: Option<ProgressStatus>,
-        score: Option<f32>,
-    ) -> Self {
-        Self {
-            id,
-            module_id,
-            title,
-            task_type,
-            content,
-            status,
-            score,
-        }
-    }
-}
 
 #[derive(Serialize, Deserialize)]
 pub struct QuizTask {

@@ -3,6 +3,7 @@ use std::fmt::Display;
 use crate::{db, AppState};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use sqlx::prelude::FromRow;
 use utoipa::ToSchema;
 
 #[derive(Serialize, Deserialize, PartialEq, Debug, ToSchema)]
@@ -40,12 +41,12 @@ impl From<String> for ProgressStatus {
     }
 }
 
-#[derive(Serialize, Deserialize, ToSchema)]
+#[derive(Serialize, Deserialize, ToSchema, FromRow)]
 pub struct Progress {
     pub id: u32,
     pub user_id: u32,
     pub task_id: i32,
-    pub status: ProgressStatus,
+    pub status: String, // ProgressStatus
     pub submission: serde_json::Value,
     pub score: f32,
     pub attempts: i32,
@@ -53,29 +54,6 @@ pub struct Progress {
     pub updated_at: DateTime<Utc>,
 }
 
-impl Progress {
-    pub fn new(
-        id: u32,
-        user_id: u32,
-        task_id: i32,
-        status: ProgressStatus,
-        submission: serde_json::Value,
-        score: f32,
-        attempts: i32,
-        updated_at: DateTime<Utc>,
-    ) -> Self {
-        Self {
-            id,
-            user_id,
-            task_id,
-            status,
-            submission,
-            score,
-            attempts,
-            updated_at,
-        }
-    }
-}
 
 pub async fn update_or_insert_status(
     state: &AppState,
