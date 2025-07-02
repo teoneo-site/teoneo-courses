@@ -43,10 +43,10 @@ impl From<String> for ProgressStatus {
 
 #[derive(Serialize, Deserialize, ToSchema, FromRow)]
 pub struct Progress {
-    pub id: u32,
-    pub user_id: u32,
+    pub id: u64,
+    pub user_id: i32,
     pub task_id: i32,
-    pub status: String, // ProgressStatus
+    pub status: String, // ProgressStatus TODO: Impl conversion trait for sqlx to convert automatically to ProgressStatus
     pub submission: serde_json::Value,
     pub score: f32,
     pub attempts: i32,

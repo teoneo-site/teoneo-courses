@@ -84,12 +84,13 @@ pub async fn fetch_courses_by_ids(
 
 
 pub async fn fetch_all_courses(state: &AppState) -> anyhow::Result<Vec<i32>> {
-    let courses_ids: Vec<i32> = sqlx::query_scalar!("SELECT id FROM courses") // Todo: Pagination with LIMIT
-        .fetch_all(&state.pool)
-        .await?;
+    let courses_ids = sqlx::query_scalar!(
+        "SELECT id FROM courses"
+    )
+    .fetch_all(&state.pool)
+    .await?;
     Ok(courses_ids)
 }
-
 pub async fn fetch_course(
     state: &AppState,
     id: i32,

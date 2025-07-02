@@ -135,11 +135,10 @@ pub async fn get_tasks_for_module(
 
 pub async fn get_task(
     state: &AppState,
-    module_id: i32,
     task_id: i32,
     user_id: Option<i32>,
 ) -> anyhow::Result<Task> {
-    let task: Task = db::taskdb::fetch_task(state, module_id, task_id, user_id).await?;
+    let task: Task = db::taskdb::fetch_task(state, task_id, user_id).await?;
     Ok(task)
 }
 

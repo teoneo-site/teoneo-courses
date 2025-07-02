@@ -109,7 +109,7 @@ pub async fn get_task(
     State(state): State<AppState>,
     OptionalQuery(query_data): OptionalQuery<ProgressQueryOptional>,
     auth_header: AuthHeader,
-    Path((course_id, module_id, task_id)): Path<(i32, i32, i32)>,
+    Path((course_id, __, task_id)): Path<(i32, i32, i32)>,
 ) -> Result<Response, AppError> {
     let user_id = auth_header.claims.id as i32;
     if let Err(why) =
@@ -130,7 +130,7 @@ pub async fn get_task(
     } else {
         None
     };
-    let task = controllers::task::get_task(&state, module_id, task_id, usr).await?;
+    let task = controllers::task::get_task(&state, task_id, usr).await?;
     let body = json!({
         "data": task,
     });

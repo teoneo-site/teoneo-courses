@@ -30,13 +30,14 @@ pub async fn fetch_tasks_for_module(
 }
 
 pub async fn fetch_task_type(pool: &MySqlPool, task_id: i32) -> anyhow::Result<TaskType> {
-    let row = sqlx::query("SELECT type FROM tasks WHERE id = ?")
-        .bind(task_id)
-        .fetch_one(pool)
-        .await?;
+    let raw_type = sqlx::query_scalar!(
+        "SELECT type FROM tasks WHERE id = ?",
+        task_id
+    )
+    .fetch_one(pool)
+    .await?;
 
-    let task_type: TaskType = row.try_get::<String, _>("type")?.into();
-    Ok(task_type)
+    Ok(TaskType::from(raw_type))
 }
 
 // Should not cache this since task_id is probably indexed so its a pretty fast search
@@ -45,30 +46,31 @@ pub async fn fetch_task_answers(
     task_type: TaskType,
     task_id: i32,
 ) -> anyhow::Result<String> {
-    let row = match task_type {
+    let answers = match task_type {
         TaskType::Quiz => {
-            sqlx::query("SELECT answers FROM quizzes WHERE task_id = ?")
-                .bind(task_id)
-                .fetch_one(pool)
-                .await
+            sqlx::query_scalar!(
+                "SELECT answers FROM quizzes WHERE task_id = ?",
+                task_id
+            )
+            .fetch_one(pool)
+            .await
         }
         TaskType::Match => {
-            sqlx::query("SELECT answers FROM matches WHERE task_id = ?")
-                .bind(task_id)
-                .fetch_one(pool)
-                .await
+            sqlx::query_scalar!(
+                "SELECT answers FROM matches WHERE task_id = ?",
+                task_id
+            )
+            .fetch_one(pool)
+            .await
         }
-        _ => {
-            panic!("Answers isn't supported for this TaskType")
-        }
+        _ => panic!("Answers isn't supported for this TaskType"),
     }?;
-    let answers: String = row.try_get(0)?;
+
     Ok(answers)
 }
 
 pub async fn fetch_task(
     state: &AppState,
-    module_id: i32,
     task_id: i32,
     user_id: Option<i32>,
 ) -> anyhow::Result<Task> {
@@ -119,11 +121,13 @@ pub async fn fetch_prompt_details(
     pool: &MySqlPool,
     task_id: i32,
 ) -> anyhow::Result<(String, Option<String>)> {
-    let row = sqlx::query_as::<_, (String, Option<String>)>(
+
+    let row = sqlx::query!(
         "SELECT question, additional_prompt FROM prompts WHERE task_id = ?",
+        task_id
     )
-    .bind(task_id)
     .fetch_one(pool)
     .await?;
-    Ok((row.0, row.1))
+
+    Ok((row.question, row.additional_prompt))
 }

@@ -12,23 +12,6 @@ pub struct ModuleInfo {
     pub theory: String,
 }
 
-impl ModuleInfo {
-    pub fn new(
-        id: i32,
-        course_id: i32,
-        title: String,
-        description: String,
-        theory: String,
-    ) -> Self {
-        Self {
-            id,
-            course_id,
-            title,
-            description,
-            theory,
-        }
-    }
-}
 
 // Functions may be later used to implement pagination or something
 pub async fn get_modules_for_course(

@@ -17,9 +17,9 @@ pub struct UserInfo {
 
 #[derive(Serialize, Deserialize, ToSchema)]
 pub struct UserStats {
-    pub courses_owned: i64,
-    pub courses_started: i64,
-    pub courses_completed: i64,
+    pub courses_owned: Option<i64>,
+    pub courses_started: Option<i64>,
+    pub courses_completed: Option<i64>,
 }
 
 pub async fn get_user_info_all(app_state: &AppState, user_id: u32) -> anyhow::Result<UserInfoFull> {
