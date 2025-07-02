@@ -82,7 +82,7 @@ pub struct TaskShortInfo {
 }
 
 
-#[derive(Serialize, Deserialize, ToSchema, FromRow)]
+#[derive(Serialize, Deserialize, ToSchema)]
 pub struct Task {
     pub id: i32,
     pub module_id: i32,

@@ -6,6 +6,67 @@ use crate::controllers::tasks::TaskShortInfo;
 use crate::controllers::tasks::TaskType;
 use crate::AppState;
 
+impl<'r> sqlx::FromRow<'r, sqlx::mysql::MySqlRow> for Task {
+    fn from_row(row: &'r sqlx::mysql::MySqlRow) -> Result<Self, sqlx::Error> {
+        let id: i32 = row.try_get("id")?;
+        let module_id: i32 = row.try_get("module_id")?;
+        let course_id: i32 = row.try_get("course_id")?;
+        let title: String = row.try_get("title")?;
+        let task_type: TaskType = row.try_get::<String, _>("task_type")?.into();
+        let status: Option<String> = row.try_get("status")?;
+        let score: Option<f32> = row.try_get("score")?;
+
+        let content = match task_type {
+            TaskType::Quiz => {
+                let question: String = row.try_get("qquestion")?;
+                println!("here");
+                let possible_answers: String = row.try_get("possible_answers")?;
+                let is_multiple: bool = row.try_get("is_multiple")?;
+
+                serde_json::json!({
+                    "question": question,
+                    "possible_answers": possible_answers.split(';').collect::<Vec<&str>>(),
+                    "is_multiple": is_multiple,
+                })
+            }
+            TaskType::Lecture => {
+                let text: String = row.try_get("text")?;
+                serde_json::json!({
+                    "text": text,
+                })
+            }
+            TaskType::Match => {
+                let question: String = row.try_get("question")?;
+                let left_items: String = row.try_get("left_items")?;
+                let right_items: String = row.try_get("right_items")?;
+
+                serde_json::json!({
+                    "question": question,
+                    "left_items": left_items.split(';').collect::<Vec<&str>>(),
+                    "right_items": right_items.split(';').collect::<Vec<&str>>(),
+                })
+            }
+            TaskType::Prompt => {
+                let question: String = row.try_get("pquestion")?;
+                let max_attempts: i32 = row.try_get("max_attempts")?;
+                serde_json::json!({
+                    "question": question,
+                    "max_attempts": max_attempts
+                })
+            }
+        };
+        Ok(Self {
+            id,
+            module_id,
+            course_id,
+            title,
+            task_type: task_type.to_string(),
+            content,
+            status,
+            score,
+        })
+    }
+}
 
 pub async fn fetch_tasks_for_module(
     state: &AppState,
