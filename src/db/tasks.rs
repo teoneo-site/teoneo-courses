@@ -13,14 +13,14 @@ pub async fn fetch_tasks_for_module(
     user_id: Option<i32>,
 ) -> anyhow::Result<Vec<TaskShortInfo>> {
     let tasks = if let Some(user_id) = user_id {
-        sqlx::query_as::<_, TaskShortInfo>("SELECT t.id, t.module_id, t.course_id, t.title, t.type, tp.status AS status FROM tasks t LEFT JOIN task_progress tp ON tp.task_id = t.id AND tp.user_id = ? WHERE t.module_id = ?")
+        sqlx::query_as::<_, TaskShortInfo>("SELECT t.id, t.module_id, t.course_id, t.title, t.type as task_type, tp.status AS status FROM tasks t LEFT JOIN task_progress tp ON tp.task_id = t.id AND tp.user_id = ? WHERE t.module_id = ?")
         .bind(user_id)
         .bind(module_id)
         .fetch_all(&state.pool)
         .await?
     } else {
         sqlx::query_as::<_, TaskShortInfo>(
-            "SELECT id, module_id, course_id, title, type FROM tasks WHERE module_id = ?",
+            "SELECT id, module_id, course_id, title, type as task_type FROM tasks WHERE module_id = ?",
         ) // Todo: Pagination with LIMIT
         .bind(module_id)
         .fetch_all(&state.pool)
@@ -59,7 +59,7 @@ pub async fn fetch_tasks_total(pool: &MySqlPool, course_id: i32) -> anyhow::Resu
 
 pub async fn fetch_task_type(pool: &MySqlPool, task_id: i32) -> anyhow::Result<TaskType> {
     let raw_type = sqlx::query_scalar!(
-        "SELECT type FROM tasks WHERE id = ?",
+        "SELECT type as task_type FROM tasks WHERE id = ?",
         task_id
     )
     .fetch_one(pool)
@@ -106,7 +106,7 @@ pub async fn fetch_task(
     let task = if let Some(user_id) = user_id {
         sqlx::query_as::<_, Task>(
             "SELECT 
-            t.id, t.module_id, t.course_id, t.title, t.type,
+            t.id, t.module_id, t.course_id, t.title, t.type as task_type,
             q.question AS qquestion, q.possible_answers, q.is_multiple,
             l.text,
             m.question, m.left_items, m.right_items,
@@ -126,7 +126,7 @@ pub async fn fetch_task(
         .await?
     } else {
         sqlx::query_as::<_, Task>(
-            "SELECT t.id, t.module_id, t.course_id, t.title, t.type,
+            "SELECT t.id, t.module_id, t.course_id, t.title, t.type as task_type,
                     q.question as qquestion, q.possible_answers, q.is_multiple,
                     l.text,
                     m.question, m.left_items, m.right_items,
