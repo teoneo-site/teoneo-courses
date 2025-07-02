@@ -194,7 +194,7 @@ pub async fn get_user_courses(State(state): State<AppState>, Path(user_id): Path
 // Internal
 #[utoipa::path(
     get,
-    description = "Возвращаются айдишники курсов юзера",
+    description = "Возвращаются айдишники начатых курсов юзера",
     path = "/internal/courses/users/{user_id}/started",
     params (
         ("user_id" = String, Path, description = "Айди юзера, курсы которого зафетчить")
@@ -211,7 +211,7 @@ pub async fn get_user_courses_started(State(state): State<AppState>, Path(user_i
 
 #[utoipa::path(
     get,
-    description = "Возвращаются айдишники курсов юзера",
+    description = "Возвращаются айдишники законч курсов юзера",
     path = "/internal/courses/users/{user_id}/completed",
     params (
         ("user_id" = String, Path, description = "Айди юзера, курсы которого зафетчить")
