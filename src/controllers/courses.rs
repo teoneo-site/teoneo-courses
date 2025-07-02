@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::prelude::FromRow;
 use utoipa::ToSchema;
 
-use crate::{db, AppState};
+use crate::{clients, db, AppState};
 #[derive(Serialize, Deserialize, ToSchema, FromRow)]
 pub struct BasicCourseInfo {
     pub id: i32,
@@ -25,8 +25,8 @@ pub struct ExtendedCourseInfo {
     pub picture_url: String,
     pub price: f64,
     pub has_course: bool,
-    pub tasks_passed: Option<i32>,
-    pub tasks_total: Option<i32>,
+    pub tasks_passed: Option<i64>,
+    pub tasks_total: Option<i64>,
 }
 #[derive(Serialize, Deserialize)]
 pub struct ShortCourseInfo {
@@ -36,25 +36,6 @@ pub struct ShortCourseInfo {
     picture_url: String,
     tasks_passed: i32,
     tasks_total: i32,
-}
-impl ShortCourseInfo {
-    pub fn new(
-        course_id: i32,
-        title: String,
-        brief_description: String,
-        picture_url: String,
-        tasks_passed: i32,
-        tasks_total: i32,
-    ) -> Self {
-        Self {
-            course_id,
-            title,
-            brief_description,
-            picture_url,
-            tasks_passed,
-            tasks_total,
-        }
-    }
 }
 
 #[derive(Serialize, Deserialize, Default, ToSchema)]
@@ -68,7 +49,7 @@ pub struct CourseProgress {
 // you can just call fetch from the handler,
 // BUT maybe we'll need this in future for some settings kinda stuff
 pub async fn get_all_courses(pool: &AppState) -> anyhow::Result<Vec<i32>> {
-    let courses = db::coursedb::fetch_all_courses(pool).await?;
+    let courses = db::courses::fetch_all_courses(pool).await?;
     Ok(courses)
 }
 
@@ -77,30 +58,54 @@ pub async fn add_course_to_favourite(
     user_id: u32,
     course_id: i32,
 ) -> anyhow::Result<()> {
-    db::coursedb::add_course_to_favourite(pool, user_id, course_id).await
+    db::courses::add_course_to_favourite(pool, user_id, course_id).await
 }
+
+
 pub async fn get_favourite_courses(pool: &AppState, user_id: u32) -> anyhow::Result<Vec<i32>> {
-    let ids = db::coursedb::get_favourite_courses(&pool, user_id).await?;
+    let ids = db::courses::get_favourite_courses(&pool, user_id).await?;
     Ok(ids)
 }
 
 pub async fn get_courses_by_ids(
-    pool: &AppState,
+    state: &AppState,
     ids: Vec<i32>,
     user_id: Option<u32>,
 ) -> anyhow::Result<Vec<ExtendedCourseInfo>> {
-    let courses = db::coursedb::fetch_courses_by_ids(pool, ids, user_id).await?;
+    let mut courses = db::courses::fetch_courses_by_ids(state, ids, user_id).await?;
+
+    if let Some(user_id) = user_id {
+        for course in &mut courses {
+            if let Ok(_) = verify_ownership(state, user_id, course.id).await {
+                course.has_course = true;
+
+                if let Ok(passed) = clients::tasks::get_tasks_passed(state, course.id, user_id).await {
+                    course.tasks_passed = Some(passed);
+                }
+            }
+            if let Ok(total) = clients::tasks::get_tasks_total(state, course.id).await {
+                course.tasks_total = Some(total);
+            }
+        }
+    }
+
     Ok(courses)
 }
 
 
 pub async fn get_course_progress(
-    pool: &AppState,
+    state: &AppState,
     course_id: i32,
     user_id: u32,
 ) -> anyhow::Result<CourseProgress> {
-    let progress = db::coursedb::get_course_progress(pool, user_id, course_id).await?;
-    Ok(progress)
+    let tasks_total = clients::tasks::get_tasks_total(state, course_id).await?;
+    let tasks_passed = clients::tasks::get_tasks_passed(state, course_id, user_id).await?;
+
+    Ok(CourseProgress { 
+        course_id: Some(course_id), 
+        tasks_passed: Some(tasks_passed), 
+        tasks_total: Some(tasks_total) 
+    })
 }
 
 // Currently, there is really no need for this method in the controller,
@@ -111,15 +116,28 @@ pub async fn get_course(
     id: i32,
     user_id: Option<u32>,
 ) -> anyhow::Result<ExtendedCourseInfo> {
-    let course = db::coursedb::fetch_course(state, id, user_id).await?;
+    let mut course = db::courses::fetch_course(state, id, user_id).await?;
+    if let Some(user_id) = user_id {
+        if let Ok(_) = verify_ownership(state, user_id, course.id).await {
+            course.has_course = true;
+
+            if let Ok(passed) = clients::tasks::get_tasks_passed(state, course.id, user_id).await {
+                course.tasks_passed = Some(passed);
+            }
+        }
+        if let Ok(total) = clients::tasks::get_tasks_total(state, course.id).await {
+            course.tasks_total = Some(total);
+        }
+    }
+
     Ok(course)
 }
 
 
 pub async fn verify_ownership(
     state: &AppState,
-    user_id: i32,
+    user_id: u32,
     course_id: i32,
 ) -> anyhow::Result<()> {
-    Ok(db::coursedb::validate_course_ownership(state, user_id, course_id).await?)
+    Ok(db::courses::validate_course_ownership(state, user_id, course_id).await?)
 }

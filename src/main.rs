@@ -23,6 +23,7 @@ mod controllers;
 mod db;
 mod handlers;
 mod swagger;
+mod clients;
 
 #[derive(Clone)]
 struct AppState {

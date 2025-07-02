@@ -1,6 +1,6 @@
 use sqlx::Row;
 
-use crate::controllers::module::ModuleInfo;
+use crate::controllers::modules::ModuleInfo;
 use crate::AppState;
 
 pub async fn fetch_modules_for_course(

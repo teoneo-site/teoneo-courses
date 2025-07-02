@@ -73,6 +73,7 @@ impl From<String> for TaskType {
 pub struct TaskShortInfo {
     pub id: i32,
     pub module_id: i32,
+    pub course_id: i32,
     pub title: String,
     #[serde(rename = "type")]
     pub task_type: String, // Task Type
@@ -85,6 +86,7 @@ pub struct TaskShortInfo {
 pub struct Task {
     pub id: i32,
     pub module_id: i32,
+    pub course_id: i32,
     pub title: String,
     #[serde(rename = "type")]
     pub task_type: String, // Task Type
@@ -129,8 +131,18 @@ pub async fn get_tasks_for_module(
     module_id: i32,
     user_id: Option<i32>,
 ) -> anyhow::Result<Vec<TaskShortInfo>> {
-    let tasks = db::taskdb::fetch_tasks_for_module(state, module_id, user_id).await?;
+    let tasks = db::tasks::fetch_tasks_for_module(state, module_id, user_id).await?;
     Ok(tasks)
+}
+
+pub async fn get_tasks_total(state: &AppState, course_id: i32) -> anyhow::Result<i64> {
+    let total = db::tasks::fetch_tasks_total(&state.pool, course_id).await?;
+    Ok(total)
+}
+
+pub async fn get_tasks_passed(state: &AppState, course_id: i32, user_id: u32) -> anyhow::Result<i64> {
+    let total = db::tasks::get_tasks_passed(&state.pool, course_id, user_id).await?;
+    Ok(total)
 }
 
 pub async fn get_task(
@@ -138,7 +150,7 @@ pub async fn get_task(
     task_id: i32,
     user_id: Option<i32>,
 ) -> anyhow::Result<Task> {
-    let task: Task = db::taskdb::fetch_task(state, task_id, user_id).await?;
+    let task: Task = db::tasks::fetch_task(state, task_id, user_id).await?;
     Ok(task)
 }
 
@@ -149,7 +161,7 @@ pub async fn submit_quiz_task(
     task_type: TaskType,
     user_answers: serde_json::Value,
 ) -> anyhow::Result<()> {
-    let answers_str = db::taskdb::fetch_task_answers(&state.pool, task_type, task_id).await?;
+    let answers_str = db::tasks::fetch_task_answers(&state.pool, task_type, task_id).await?;
     let task_answers: Vec<u8> = answers_str
         .split(";")
         .map(|element| element.parse::<u8>().unwrap_or(0))
@@ -200,9 +212,8 @@ pub async fn process_prompt_task(
         // Get attemps, max attemps and additional_field
         let mut state = state;
 
-        let (question, add_prompt) = db::taskdb::fetch_prompt_details(&state.pool, task_id) // Again, task_id is 100% Prompt type
-            .await
-            .unwrap(); // This should not panic,only if Databse is broken, but then it will return 500 Server Internal Error on Panic
+        let (question, add_prompt) = db::tasks::fetch_prompt_details(&state.pool, task_id) // Again, task_id is 100% Prompt type
+            .await.unwrap(); // This should not panic,only if Databse is broken, but then it will return 500 Server Internal Error on Panic
         let user_prompt = user_answers["data"]["user_prompt"]
             .as_str()
             .unwrap_or_default();
@@ -216,7 +227,6 @@ pub async fn process_prompt_task(
             );
 
         let reply = state.ai.send_message(message.into()).await.unwrap(); // Should not panic under normal circumstances, only if gigachat is down, then it returns 500 Server internal error
-        println!("GIGACHAT REPLY: {}", reply.content);
 
         let reply_struct: PromptReply = match serde_json::from_str(&reply.content) {
             Ok(parsed) => parsed,

@@ -64,7 +64,7 @@ pub async fn update_or_insert_status(
     score: f32,
     attempts: i32,
 ) -> anyhow::Result<()> {
-    db::progressdb::update_or_insert(state, user_id, task_id, status, submission, score, attempts)
+    db::progress::update_or_insert(state, user_id, task_id, status, submission, score, attempts)
         .await?;
     Ok(())
 }
@@ -74,7 +74,7 @@ pub async fn get_task_progress(
     user_id: u32,
     task_id: i32,
 ) -> anyhow::Result<Progress> {
-    let progress = db::progressdb::fetch_task_progress(state, user_id, task_id).await?;
+    let progress = db::progress::fetch_task_progress(state, user_id, task_id).await?;
     Ok(progress)
 }
 

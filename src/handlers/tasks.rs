@@ -18,7 +18,7 @@ use crate::{
     controllers::{
         self,
         progress::{self, Progress, ProgressStatus},
-        task::{process_prompt_task, Task, TaskShortInfo, TaskType},
+        tasks::{process_prompt_task, Task, TaskShortInfo, TaskType},
     },
     db, error_response,
     AppState,
@@ -54,7 +54,7 @@ pub async fn get_tasks_for_module(
 ) -> Result<Response, AppError> {
     let user_id = auth_header.claims.id as i32;
     if let Err(why) =
-        controllers::course::verify_ownership(&state, auth_header.claims.id as i32, course_id).await
+        controllers::courses::verify_ownership(&state, auth_header.claims.id, course_id).await
     {
         tracing::error!("Could not verify course ownership {}", why);
 
@@ -66,7 +66,7 @@ pub async fn get_tasks_for_module(
     }
     let should_display_status = query_data.map(|val| val.with_status).unwrap_or(false);
 
-    let tasks = controllers::task::get_tasks_for_module(
+    let tasks = controllers::tasks::get_tasks_for_module(
         &state,
         module_id,
         if should_display_status {
@@ -113,7 +113,7 @@ pub async fn get_task(
 ) -> Result<Response, AppError> {
     let user_id = auth_header.claims.id as i32;
     if let Err(why) =
-        controllers::course::verify_ownership(&state, auth_header.claims.id as i32, course_id).await
+        controllers::courses::verify_ownership(&state, auth_header.claims.id, course_id).await
     {
         // Does not own the course
         tracing::error!("Could not verify course ownership {}", why);
@@ -130,7 +130,7 @@ pub async fn get_task(
     } else {
         None
     };
-    let task = controllers::task::get_task(&state, task_id, usr).await?;
+    let task = controllers::tasks::get_task(&state, task_id, usr).await?;
     let body = json!({
         "data": task,
     });
@@ -166,7 +166,7 @@ pub async fn submit_task(
     Json(user_answers): Json<serde_json::Value>,
 ) -> Result<Response, AppError> {
     let user_id = auth_header.claims.id;
-    if let Err(why) = controllers::course::verify_ownership(&state, user_id as i32, course_id).await
+    if let Err(why) = controllers::courses::verify_ownership(&state, user_id, course_id).await
     {
         // Does not own the course
         tracing::error!("Could not verify course ownership {}", why);
@@ -178,7 +178,7 @@ pub async fn submit_task(
         ));
     }
 
-    let task_type = db::taskdb::fetch_task_type(&state.pool, task_id).await?;
+    let task_type = db::tasks::fetch_task_type(&state.pool, task_id).await?;
 
     // Insert EVAL progress status
     // Frontend can query status at this point
@@ -196,7 +196,7 @@ pub async fn submit_task(
 
     match task_type {
         TaskType::Quiz | TaskType::Match => {
-            controllers::task::submit_quiz_task(
+            controllers::tasks::submit_quiz_task(
                 &state,
                 user_id,
                 task_id,
@@ -208,7 +208,7 @@ pub async fn submit_task(
         }
         TaskType::Prompt => {
             let (attempts, max_attemps) =
-                db::progressdb::get_prompt_task_attemps(&state.pool, user_id, task_id) // Task is supposed to be prompt 100% at this point
+                db::progress::get_prompt_task_attemps(&state.pool, user_id, task_id) // Task is supposed to be prompt 100% at this point
                     .await
                     .unwrap(); // So unwrap() should not panic
             if attempts >= max_attemps {
@@ -273,7 +273,7 @@ pub async fn task_progress(
 ) -> Result<Response, AppError> {
     let user_id = auth_header.claims.id;
     if let Err(why) =
-        controllers::course::verify_ownership(&state, user_id as i32, course_id).await
+        controllers::courses::verify_ownership(&state, user_id, course_id).await
     {
         // Does not own the course
         tracing::error!("Could not verify course ownership {}", why);

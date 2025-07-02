@@ -2,7 +2,7 @@ use crate::{
     common::{self, error::{AppError, ErrorResponse}, token::{AuthHeader, OptionalBearerClaims}},
     controllers::{
         self,
-        course::{CourseProgress, ExtendedCourseInfo},
+        courses::{CourseProgress, ExtendedCourseInfo},
     },
     AppState,
 };
@@ -31,7 +31,7 @@ pub struct IdsStruct {
     )
 )]
 pub async fn get_all_courses(State(state): State<AppState>) -> Result<Response, AppError> {
-    let courses = controllers::course::get_all_courses(&state).await?;
+    let courses = controllers::courses::get_all_courses(&state).await?;
     let body = json!({
         "data": courses,
     });
@@ -60,7 +60,7 @@ pub async fn get_courses_by_ids(
     Query(ids): Query<IdsStruct>,
 ) -> Result<Response, AppError> {
     let courses =
-        controllers::course::get_courses_by_ids(&state, ids.ids, auth_token.0).await?;
+        controllers::courses::get_courses_by_ids(&state, ids.ids, auth_token.0).await?;
     let body = json!({
         "data": courses,
     });
@@ -88,7 +88,7 @@ pub async fn get_course(
 ) -> Result<Response, AppError> {
 
     let course =
-        controllers::course::get_course(&state, course_id, auth_token.0).await?;
+        controllers::courses::get_course(&state, course_id, auth_token.0).await?;
     let body = json!({
         "data": course,
     });
@@ -115,7 +115,7 @@ pub async fn get_course_progress(
     auth_token: AuthHeader,
 ) -> Result<Response, AppError> {
     let user_id = auth_token.claims.id;
-    let progress = controllers::course::get_course_progress(&state, course_id, user_id).await?;
+    let progress = controllers::courses::get_course_progress(&state, course_id, user_id).await?;
     let body = json!({
         "data": progress,
     });
@@ -142,7 +142,7 @@ pub async fn add_course_to_favourite(
     auth_header: AuthHeader,
 ) -> Result<Response, AppError> {
     let user_id = auth_header.claims.id;
-    controllers::course::add_course_to_favourite(&state, user_id, course_id).await?;
+    controllers::courses::add_course_to_favourite(&state, user_id, course_id).await?;
     Ok((StatusCode::OK).into_response())
 }
 
@@ -165,7 +165,7 @@ pub async fn get_favourite_courses(
 ) -> Result<Response, AppError> {
     let user_id = auth_header.claims.id;
 
-    let ids = controllers::course::get_favourite_courses(&state, user_id).await?;
+    let ids = controllers::courses::get_favourite_courses(&state, user_id).await?;
     let body = json!({
         "data": ids,
     });

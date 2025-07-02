@@ -23,19 +23,19 @@ pub struct UserStats {
 }
 
 pub async fn get_user_info_all(app_state: &AppState, user_id: u32) -> anyhow::Result<UserInfoFull> {
-    let info = db::userdb::get_user_info_all(app_state, user_id).await?;
+    let info = db::users::get_user_info_all(app_state, user_id).await?;
     Ok(info)
 }
 pub async fn get_courses_info(app_state: &AppState, user_id: u32) -> anyhow::Result<Vec<i32>> {
-    let info = db::userdb::get_courses_info(app_state, user_id).await?;
+    let info = db::users::get_courses_info(app_state, user_id).await?;
     Ok(info)
 }
 pub async fn get_user_info(app_state: &AppState, user_id: u32) -> anyhow::Result<UserInfo> {
-    let info = db::userdb::get_user_info(app_state, user_id).await?;
+    let info = db::users::get_user_info(app_state, user_id).await?;
     Ok(info)
 }
 
 pub async fn get_user_stats(app_state: &AppState, user_id: u32) -> anyhow::Result<UserStats> {
-    let stats = db::userdb::get_user_stats(app_state, user_id).await?;
+    let stats = db::users::get_user_stats(app_state, user_id).await?;
     Ok(stats)
 }

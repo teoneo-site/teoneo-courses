@@ -10,7 +10,7 @@ use crate::{
     common::{error::{AppError, ErrorResponse}, token::AuthHeader},
     controllers::{
         self,
-        user::{UserInfo, UserInfoFull, UserStats},
+        users::{UserInfo, UserInfoFull, UserStats},
     },
     AppState,
 };
@@ -61,12 +61,12 @@ pub async fn get_user_info_and_courses(
     let user_id = auth_header.claims.id;
     match value.value {
         ValueInfo::All => {
-            handle_result(controllers::user::get_user_info_all(&state, user_id)).await
+            handle_result(controllers::users::get_user_info_all(&state, user_id)).await
         }
         ValueInfo::Courses => {
-            handle_result(controllers::user::get_courses_info(&state, user_id)).await
+            handle_result(controllers::users::get_courses_info(&state, user_id)).await
         }
-        ValueInfo::User => handle_result(controllers::user::get_user_info(&state, user_id)).await,
+        ValueInfo::User => handle_result(controllers::users::get_user_info(&state, user_id)).await,
     }
 }
 
@@ -87,6 +87,6 @@ pub async fn get_user_stats(
     auth_header: AuthHeader,
 ) -> Result<Response, AppError> {
     let user_id = auth_header.claims.id;
-    let stats = controllers::user::get_user_stats(&state, user_id).await?;
+    let stats = controllers::users::get_user_stats(&state, user_id).await?;
     Ok((StatusCode::OK, axum::Json(stats)).into_response())
 }

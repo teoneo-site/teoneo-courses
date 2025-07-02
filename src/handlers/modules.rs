@@ -7,7 +7,7 @@ use serde_json::json;
 
 use crate::{
     common::{error::{AppError, ErrorResponse}, token::OptionalBearerClaims},
-    controllers::{self, module::ModuleInfo},
+    controllers::{self, modules::ModuleInfo},
     AppState,
 };
 
@@ -28,7 +28,7 @@ pub async fn get_modules_for_course(
     State(state): State<AppState>,
     Path(course_id): Path<i32>,
 ) -> Result<Response, AppError> {
-    let modules = controllers::module::get_modules_for_course(&state, course_id).await?;
+    let modules = controllers::modules::get_modules_for_course(&state, course_id).await?;
     let mut json: serde_json::value::Value = serde_json::Value::Null;
     json["data"] = serde_json::Value::Array([].to_vec());
 
@@ -67,7 +67,7 @@ pub async fn get_module(
 ) -> Result<Response, AppError> {
     let is_subscribed_to_course =
         if let Some(user_id) = auth_token.0 {
-            match controllers::course::verify_ownership(&state, user_id as i32, course_id).await {
+            match controllers::courses::verify_ownership(&state, user_id, course_id).await {
                 Ok(_) => true,
                 Err(why) => {
                     tracing::error!("verify_ownership failed: {}", why);
@@ -78,7 +78,7 @@ pub async fn get_module(
             false
         };
 
-    let module = controllers::module::get_module(&state, course_id, module_id).await?;
+    let module = controllers::modules::get_module(&state, course_id, module_id).await?;
     let body = if is_subscribed_to_course {
         json!({
             "data": module,

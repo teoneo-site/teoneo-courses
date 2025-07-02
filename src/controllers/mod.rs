@@ -1,5 +1,5 @@
-pub mod course;
-pub mod module;
+pub mod courses;
+pub mod modules;
 pub mod progress;
-pub mod task;
-pub mod user;
+pub mod tasks;
+pub mod users;

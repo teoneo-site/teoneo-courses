@@ -1,9 +1,9 @@
 use sqlx::MySqlPool;
 use sqlx::Row;
 
-use crate::controllers::task::Task;
-use crate::controllers::task::TaskShortInfo;
-use crate::controllers::task::TaskType;
+use crate::controllers::tasks::Task;
+use crate::controllers::tasks::TaskShortInfo;
+use crate::controllers::tasks::TaskType;
 use crate::AppState;
 
 
@@ -13,20 +13,48 @@ pub async fn fetch_tasks_for_module(
     user_id: Option<i32>,
 ) -> anyhow::Result<Vec<TaskShortInfo>> {
     let tasks = if let Some(user_id) = user_id {
-        sqlx::query_as::<_, TaskShortInfo>("SELECT t.id, t.module_id, t.title, t.type, tp.status AS status FROM tasks t LEFT JOIN task_progress tp ON tp.task_id = t.id AND tp.user_id = ? WHERE t.module_id = ?")
+        sqlx::query_as::<_, TaskShortInfo>("SELECT t.id, t.module_id, t.course_id, t.title, t.type, tp.status AS status FROM tasks t LEFT JOIN task_progress tp ON tp.task_id = t.id AND tp.user_id = ? WHERE t.module_id = ?")
         .bind(user_id)
         .bind(module_id)
         .fetch_all(&state.pool)
         .await?
     } else {
         sqlx::query_as::<_, TaskShortInfo>(
-            "SELECT id, module_id, title, type FROM tasks WHERE module_id = ?",
+            "SELECT id, module_id, course_id, title, type FROM tasks WHERE module_id = ?",
         ) // Todo: Pagination with LIMIT
         .bind(module_id)
         .fetch_all(&state.pool)
         .await?
     };
     Ok(tasks)
+}
+
+pub async fn get_tasks_passed(
+    pool: &MySqlPool,
+    course_id: i32,
+    user_id: u32,
+) -> anyhow::Result<i64> {
+    let total = sqlx::query_scalar!(
+        r#"
+        SELECT COUNT(*) as "count"
+        FROM task_progress tp
+        JOIN tasks t ON tp.task_id = t.id
+        WHERE tp.user_id = ? AND tp.status = 'SUCCESS' AND t.course_id = ?
+        "#,
+        user_id,
+        course_id
+    )
+    .fetch_one(pool)
+    .await?;
+
+    Ok(total)
+}
+
+pub async fn fetch_tasks_total(pool: &MySqlPool, course_id: i32) -> anyhow::Result<i64> {
+    let result = sqlx::query!("SELECT COUNT(*) AS tasks_total FROM tasks WHERE course_id = ?", course_id)   
+        .fetch_one(pool)
+        .await?;
+    Ok(result.tasks_total)
 }
 
 pub async fn fetch_task_type(pool: &MySqlPool, task_id: i32) -> anyhow::Result<TaskType> {
@@ -78,8 +106,8 @@ pub async fn fetch_task(
     let task = if let Some(user_id) = user_id {
         sqlx::query_as::<_, Task>(
             "SELECT 
-            t.id, t.module_id, t.title, t.type,
-            q.question as qquestion, q.possible_answers, q.is_multiple,
+            t.id, t.module_id, t.course_id, t.title, t.type,
+            q.question AS qquestion, q.possible_answers, q.is_multiple,
             l.text,
             m.question, m.left_items, m.right_items,
             p.question as pquestion, p.max_attempts,
@@ -98,7 +126,7 @@ pub async fn fetch_task(
         .await?
     } else {
         sqlx::query_as::<_, Task>(
-            "SELECT t.id, t.module_id, t.title, t.type,
+            "SELECT t.id, t.module_id, t.course_id, t.title, t.type,
                     q.question as qquestion, q.possible_answers, q.is_multiple,
                     l.text,
                     m.question, m.left_items, m.right_items,

@@ -2,9 +2,9 @@ use anyhow::anyhow;
 use sqlx::Row;
 
 use crate::controllers;
-use crate::controllers::user::UserInfo;
-use crate::controllers::user::UserInfoFull;
-use crate::controllers::user::UserStats;
+use crate::controllers::users::UserInfo;
+use crate::controllers::users::UserInfoFull;
+use crate::controllers::users::UserStats;
 use crate::AppState;
 
 pub async fn get_user_info(state: &AppState, user_id: u32) -> anyhow::Result<UserInfo> {

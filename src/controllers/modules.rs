@@ -18,7 +18,7 @@ pub async fn get_modules_for_course(
     state: &AppState,
     course_id: i32,
 ) -> anyhow::Result<Vec<ModuleInfo>> {
-    let modules = db::moduledb::fetch_modules_for_course(state, course_id).await?;
+    let modules = db::modules::fetch_modules_for_course(state, course_id).await?;
     Ok(modules)
 }
 
@@ -27,6 +27,6 @@ pub async fn get_module(
     course_id: i32,
     module_id: i32,
 ) -> anyhow::Result<ModuleInfo> {
-    let module = db::moduledb::fetch_module(state, course_id, module_id).await?;
+    let module = db::modules::fetch_module(state, course_id, module_id).await?;
     Ok(module)
 }
