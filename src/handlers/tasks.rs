@@ -13,15 +13,12 @@ use serde_json::json;
 use crate::{
     common::{
         error::{AppError, ErrorResponse, ErrorTypes},
-        token::{AuthHeader},
-    },
-    controllers::{
+        token::AuthHeader,
+    }, controllers::{
         self,
         progress::{self, Progress, ProgressStatus},
         tasks::{process_prompt_task, Task, TaskShortInfo, TaskType},
-    },
-    db, error_response,
-    AppState,
+    }, db, error_response, AppState, BasicState
 };
 
 
@@ -47,7 +44,7 @@ pub struct StatusQueryOptional {
     )
 )]
 pub async fn get_tasks_for_module(
-    State(state): State<AppState>,
+    State(state): State<BasicState>,
     OptionalQuery(query_data): OptionalQuery<StatusQueryOptional>,
     auth_header: AuthHeader,
     Path((course_id, module_id)): Path<(i32, i32)>,
@@ -106,7 +103,7 @@ pub struct ProgressQueryOptional {
     )
 )]
 pub async fn get_task(
-    State(state): State<AppState>,
+    State(state): State<BasicState>,
     OptionalQuery(query_data): OptionalQuery<ProgressQueryOptional>,
     auth_header: AuthHeader,
     Path((course_id, __, task_id)): Path<(i32, i32, i32)>,
@@ -166,7 +163,7 @@ pub async fn submit_task(
     Json(user_answers): Json<serde_json::Value>,
 ) -> Result<Response, AppError> {
     let user_id = auth_header.claims.id;
-    if let Err(why) = controllers::courses::verify_ownership(&state, user_id, course_id).await
+    if let Err(why) = controllers::courses::verify_ownership(&state.basic, user_id, course_id).await
     {
         // Does not own the course
         tracing::error!("Could not verify course ownership {}", why);
@@ -178,12 +175,12 @@ pub async fn submit_task(
         ));
     }
 
-    let task_type = db::tasks::fetch_task_type(&state.pool, task_id).await?;
+    let task_type = db::tasks::fetch_task_type(&state.basic.pool, task_id).await?;
 
     // Insert EVAL progress status
     // Frontend can query status at this point
     controllers::progress::update_or_insert_status(
-        &state,
+        &state.basic,
         user_id,
         task_id,
         ProgressStatus::Eval,
@@ -197,7 +194,7 @@ pub async fn submit_task(
     match task_type {
         TaskType::Quiz | TaskType::Match => {
             controllers::tasks::submit_quiz_task(
-                &state,
+                &state.basic,
                 user_id,
                 task_id,
                 task_type,
@@ -208,7 +205,7 @@ pub async fn submit_task(
         }
         TaskType::Prompt => {
             let (attempts, max_attemps) =
-                db::progress::get_prompt_task_attemps(&state.pool, user_id, task_id) // Task is supposed to be prompt 100% at this point
+                db::progress::get_prompt_task_attemps(&state.basic.pool, user_id, task_id) // Task is supposed to be prompt 100% at this point
                     .await
                     .unwrap(); // So unwrap() should not panic
             if attempts >= max_attemps {
@@ -233,7 +230,7 @@ pub async fn submit_task(
         }
         TaskType::Lecture => {
             progress::update_or_insert_status(
-                &state,
+                &state.basic,
                 user_id,
                 task_id,
                 ProgressStatus::Success,
@@ -267,7 +264,7 @@ pub async fn submit_task(
     )
 )]
 pub async fn task_progress(
-    State(state): State<AppState>,
+    State(state): State<BasicState>,
     auth_header: AuthHeader,
     Path((course_id, _module_id, task_id)): Path<(i32, i32, i32)>,
 ) -> Result<Response, AppError> {

@@ -2,21 +2,11 @@ use serde::{Deserialize, Serialize};
 use sqlx::prelude::FromRow;
 use utoipa::ToSchema;
 
-use crate::{clients, db, AppState};
-#[derive(Serialize, Deserialize, ToSchema, FromRow)]
-pub struct BasicCourseInfo {
-    pub id: i32,
-    pub title: String,
-    pub brief_description: String,
-    pub full_description: String,
-    pub tags: String,
-    pub picture_url: String,
-    pub price: f64,
-}
+use crate::{clients, db, BasicState};
 
 
 #[derive(Serialize, Deserialize, Clone, ToSchema, FromRow)]
-pub struct ExtendedCourseInfo {
+pub struct CourseInfo {
     pub id: i32,
     pub title: String,
     pub brief_description: String,
@@ -27,15 +17,6 @@ pub struct ExtendedCourseInfo {
     pub has_course: bool,
     pub tasks_passed: Option<i64>,
     pub tasks_total: Option<i64>,
-}
-#[derive(Serialize, Deserialize)]
-pub struct ShortCourseInfo {
-    course_id: i32,
-    title: String,
-    brief_description: String,
-    picture_url: String,
-    tasks_passed: i32,
-    tasks_total: i32,
 }
 
 #[derive(Serialize, Deserialize, Default, ToSchema)]
@@ -48,13 +29,13 @@ pub struct CourseProgress {
 // Currently, there is really no need for this method in the controller,
 // you can just call fetch from the handler,
 // BUT maybe we'll need this in future for some settings kinda stuff
-pub async fn get_all_courses(pool: &AppState) -> anyhow::Result<Vec<i32>> {
+pub async fn get_all_courses(pool: &BasicState) -> anyhow::Result<Vec<i32>> {
     let courses = db::courses::fetch_all_courses(pool).await?;
     Ok(courses)
 }
 
 pub async fn add_course_to_favourite(
-    pool: &AppState,
+    pool: &BasicState,
     user_id: u32,
     course_id: i32,
 ) -> anyhow::Result<()> {
@@ -62,31 +43,31 @@ pub async fn add_course_to_favourite(
 }
 
 
-pub async fn get_favourite_courses(pool: &AppState, user_id: u32) -> anyhow::Result<Vec<i32>> {
+pub async fn get_favourite_courses(pool: &BasicState, user_id: u32) -> anyhow::Result<Vec<i32>> {
     let ids = db::courses::get_favourite_courses(&pool, user_id).await?;
     Ok(ids)
 }
 
-pub async fn get_user_courses(state: &AppState, user_id: u32) -> anyhow::Result<Vec<i32>> {
+pub async fn get_user_courses(state: &BasicState, user_id: u32) -> anyhow::Result<Vec<i32>> {
     let ids = db::courses::fetch_user_courses(state, user_id).await?;
     Ok(ids)
 }
 
-pub async fn get_user_courses_started(state: &AppState, user_id: u32) -> anyhow::Result<Vec<i32>> {
+pub async fn get_user_courses_started(state: &BasicState, user_id: u32) -> anyhow::Result<Vec<i32>> {
     let courses_started = clients::tasks::get_started_courses(state, user_id).await?;
     Ok(courses_started)
 }
 
-pub async fn get_user_courses_completed(state: &AppState, user_id: u32) -> anyhow::Result<Vec<i32>> {
+pub async fn get_user_courses_completed(state: &BasicState, user_id: u32) -> anyhow::Result<Vec<i32>> {
     let courses_started = clients::tasks::get_completed_courses(state, user_id).await?;
     Ok(courses_started)
 }
 
 pub async fn get_courses_by_ids(
-    state: &AppState,
+    state: &BasicState,
     ids: Vec<i32>,
     user_id: Option<u32>,
-) -> anyhow::Result<Vec<ExtendedCourseInfo>> {
+) -> anyhow::Result<Vec<CourseInfo>> {
     let mut courses = db::courses::fetch_courses_by_ids(state, ids, user_id).await?;
 
     if let Some(user_id) = user_id {
@@ -109,7 +90,7 @@ pub async fn get_courses_by_ids(
 
 
 pub async fn get_course_progress(
-    state: &AppState,
+    state: &BasicState,
     course_id: i32,
     user_id: u32,
 ) -> anyhow::Result<CourseProgress> {
@@ -127,10 +108,10 @@ pub async fn get_course_progress(
 // you can just call fetch from the handler,
 // BUT maybe we'll need this in future for some settings kinda stuff
 pub async fn get_course(
-    state: &AppState,
+    state: &BasicState,
     id: i32,
     user_id: Option<u32>,
-) -> anyhow::Result<ExtendedCourseInfo> {
+) -> anyhow::Result<CourseInfo> {
     let mut course = db::courses::fetch_course(state, id, user_id).await?;
     if let Some(user_id) = user_id {
         if let Ok(_) = verify_ownership(state, user_id, course.id).await {
@@ -150,7 +131,7 @@ pub async fn get_course(
 
 
 pub async fn verify_ownership(
-    state: &AppState,
+    state: &BasicState,
     user_id: u32,
     course_id: i32,
 ) -> anyhow::Result<()> {

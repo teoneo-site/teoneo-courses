@@ -1,10 +1,11 @@
+use redis::Commands;
 use sqlx::MySqlPool;
 use sqlx::Row;
 
 use crate::controllers::tasks::Task;
 use crate::controllers::tasks::TaskShortInfo;
 use crate::controllers::tasks::TaskType;
-use crate::AppState;
+use crate::BasicState;
 
 impl<'r> sqlx::FromRow<'r, sqlx::mysql::MySqlRow> for Task {
     fn from_row(row: &'r sqlx::mysql::MySqlRow) -> Result<Self, sqlx::Error> {
@@ -69,10 +70,12 @@ impl<'r> sqlx::FromRow<'r, sqlx::mysql::MySqlRow> for Task {
 }
 
 pub async fn fetch_tasks_for_module(
-    state: &AppState,
+    state: &BasicState,
     module_id: i32,
     user_id: Option<i32>,
 ) -> anyhow::Result<Vec<TaskShortInfo>> {
+    
+    
     let tasks = if let Some(user_id) = user_id {
         sqlx::query_as::<_, TaskShortInfo>("SELECT t.id, t.module_id, t.course_id, t.title, t.type as task_type, tp.status AS status FROM tasks t LEFT JOIN task_progress tp ON tp.task_id = t.id AND tp.user_id = ? WHERE t.module_id = ?")
         .bind(user_id)
@@ -80,13 +83,32 @@ pub async fn fetch_tasks_for_module(
         .fetch_all(&state.pool)
         .await?
     } else {
-        sqlx::query_as::<_, TaskShortInfo>(
+        let cache_key = format!("modules:{}:tasks", module_id);
+        if let Ok(mut conn) = state.redis.get() {
+            if let Ok(val) = conn.get::<String, String>(cache_key.clone()) {
+                if let Ok(parsed_module) = serde_json::from_str::<Vec<TaskShortInfo>>(&val) {
+                    return Ok(parsed_module)
+                }
+            }
+        }
+
+        let tasks = sqlx::query_as::<_, TaskShortInfo>(
             "SELECT id, module_id, course_id, title, type as task_type FROM tasks WHERE module_id = ?",
         ) // Todo: Pagination with LIMIT
         .bind(module_id)
         .fetch_all(&state.pool)
-        .await?
+        .await?;
+
+        if let Ok(mut conn) = state.redis.get() {
+            let result_str = serde_json::to_string(&tasks).unwrap();
+            conn.set_ex(cache_key, result_str, 3600).unwrap_or(()); // user may buy a course, so expire date should be short
+        }    
+
+        tasks
     };
+
+    
+
     Ok(tasks)
 }
 
@@ -159,7 +181,7 @@ pub async fn fetch_task_answers(
 }
 
 pub async fn fetch_task(
-    state: &AppState,
+    state: &BasicState,
     task_id: i32,
     user_id: Option<i32>,
 ) -> anyhow::Result<Task> {
@@ -186,7 +208,16 @@ pub async fn fetch_task(
         .fetch_one(&state.pool)
         .await?
     } else {
-        sqlx::query_as::<_, Task>(
+        let cache_key = format!("tasks:{}", task_id);
+        if let Ok(mut conn) = state.redis.get() {
+            if let Ok(val) = conn.get::<String, String>(cache_key.clone()) {
+                if let Ok(parsed_module) = serde_json::from_str::<Task>(&val) {
+                    return Ok(parsed_module)
+                }
+            }
+        }
+
+        let task = sqlx::query_as::<_, Task>(
             "SELECT t.id, t.module_id, t.course_id, t.title, t.type as task_type,
                     q.question as qquestion, q.possible_answers, q.is_multiple,
                     l.text,
@@ -201,7 +232,14 @@ pub async fn fetch_task(
         )
         .bind(task_id)
         .fetch_one(&state.pool)
-        .await?
+        .await?;
+
+        if let Ok(mut conn) = state.redis.get() {
+            let result_str = serde_json::to_string(&task).unwrap();
+            conn.set_ex(cache_key, result_str, 3600).unwrap_or(()); // user may buy a course, so expire date should be short
+        }    
+
+        task
     };
     Ok(task)
 }

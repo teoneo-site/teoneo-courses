@@ -1,10 +1,10 @@
 use crate::{
-    common::{self, error::{AppError, ErrorResponse}, token::{AuthHeader, OptionalBearerClaims}},
+    common::{error::{AppError, ErrorResponse}, token::{AuthHeader, OptionalBearerClaims}},
     controllers::{
         self,
-        courses::{CourseProgress, ExtendedCourseInfo},
+        courses::{CourseInfo, CourseProgress},
     },
-    AppState,
+    BasicState,
 };
 use axum::{
     extract::{Path, State},
@@ -30,7 +30,7 @@ pub struct IdsStruct {
         (status = 500, description = "Что-то случилось", body = ErrorResponse),
     )
 )]
-pub async fn get_all_courses(State(state): State<AppState>) -> Result<Response, AppError> {
+pub async fn get_all_courses(State(state): State<BasicState>) -> Result<Response, AppError> {
     let courses = controllers::courses::get_all_courses(&state).await?;
     let body = json!({
         "data": courses,
@@ -49,13 +49,13 @@ pub async fn get_all_courses(State(state): State<AppState>) -> Result<Response, 
         ("Authorization" = String, Header, description = "(Опционально) JWT")
     ),
     responses(
-        (status = 200, description = "Успешно", body = Vec<ExtendedCourseInfo>),
-        (status = 400, description = "Нет токена в за", body = Vec<ExtendedCourseInfo>),
+        (status = 200, description = "Успешно", body = Vec<CourseInfo>),
+        (status = 400, description = "Нет токена в за", body = Vec<CourseInfo>),
         (status = 500, description = "Что-то случилось", body = ErrorResponse)
     )
 )]
 pub async fn get_courses_by_ids(
-    State(state): State<AppState>,
+    State(state): State<BasicState>,
     auth_token: OptionalBearerClaims,
     Query(ids): Query<IdsStruct>,
 ) -> Result<Response, AppError> {
@@ -77,12 +77,12 @@ pub async fn get_courses_by_ids(
         ("Authorization" = String, Header, description = "(Опционально) JWT")
     ),
     responses(
-        (status = 200, description = "Успешно", body = ExtendedCourseInfo),
+        (status = 200, description = "Успешно", body = CourseInfo),
         (status = 500, description = "Что-то случилось", body = ErrorResponse)
     )
 )]
 pub async fn get_course(
-    State(state): State<AppState>,
+    State(state): State<BasicState>,
     auth_token: OptionalBearerClaims,
     Path(course_id): Path<i32>,
 ) -> Result<Response, AppError> {
@@ -110,7 +110,7 @@ pub async fn get_course(
     )
 )]
 pub async fn get_course_progress(
-    State(state): State<AppState>,
+    State(state): State<BasicState>,
     Path(course_id): Path<i32>,
     auth_token: AuthHeader,
 ) -> Result<Response, AppError> {
@@ -137,7 +137,7 @@ pub async fn get_course_progress(
     )
 )]
 pub async fn add_course_to_favourite(
-    State(state): State<AppState>,
+    State(state): State<BasicState>,
     Path(course_id): Path<i32>,
     auth_header: AuthHeader,
 ) -> Result<Response, AppError> {
@@ -160,7 +160,7 @@ pub async fn add_course_to_favourite(
     )
 )]
 pub async fn get_favourite_courses(
-    State(state): State<AppState>,
+    State(state): State<BasicState>,
     auth_header: AuthHeader,
 ) -> Result<Response, AppError> {
     let user_id = auth_header.claims.id;
@@ -186,7 +186,7 @@ pub async fn get_favourite_courses(
         (status = 500, description = "Что-то случилось", body = ErrorResponse)
     )
 )]
-pub async fn get_user_courses(State(state): State<AppState>, Path(user_id): Path<u32>) -> Result<Response, AppError> {
+pub async fn get_user_courses(State(state): State<BasicState>, Path(user_id): Path<u32>) -> Result<Response, AppError> {
     let ids = controllers::courses::get_user_courses(&state, user_id).await?;
     Ok((StatusCode::OK, axum::Json(ids)).into_response())
 }
@@ -204,7 +204,7 @@ pub async fn get_user_courses(State(state): State<AppState>, Path(user_id): Path
         (status = 500, description = "Что-то случилось", body = ErrorResponse)
     )
 )]
-pub async fn get_user_courses_started(State(state): State<AppState>, Path(user_id): Path<u32>) -> Result<Response, AppError> {
+pub async fn get_user_courses_started(State(state): State<BasicState>, Path(user_id): Path<u32>) -> Result<Response, AppError> {
     let ids = controllers::courses::get_user_courses_started(&state, user_id).await?;
     Ok((StatusCode::OK, axum::Json(ids)).into_response())
 }
@@ -221,7 +221,7 @@ pub async fn get_user_courses_started(State(state): State<AppState>, Path(user_i
         (status = 500, description = "Что-то случилось", body = ErrorResponse)
     )
 )]
-pub async fn get_user_courses_completed(State(state): State<AppState>, Path(user_id): Path<u32>) -> Result<Response, AppError> {
+pub async fn get_user_courses_completed(State(state): State<BasicState>, Path(user_id): Path<u32>) -> Result<Response, AppError> {
     let ids = controllers::courses::get_user_courses_completed(&state, user_id).await?;
     Ok((StatusCode::OK, axum::Json(ids)).into_response())
 }

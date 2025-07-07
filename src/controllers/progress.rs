@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use crate::{db, AppState};
+use crate::{db, BasicState};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::prelude::FromRow;
@@ -56,7 +56,7 @@ pub struct Progress {
 
 
 pub async fn update_or_insert_status(
-    state: &AppState,
+    state: &BasicState,
     user_id: u32,
     task_id: i32,
     status: ProgressStatus,
@@ -70,7 +70,7 @@ pub async fn update_or_insert_status(
 }
 
 pub async fn get_task_progress(
-    state: &AppState,
+    state: &BasicState,
     user_id: u32,
     task_id: i32,
 ) -> anyhow::Result<Progress> {

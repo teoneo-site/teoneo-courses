@@ -2,11 +2,11 @@ use sqlx::MySqlPool;
 
 use crate::controllers::progress::Progress;
 use crate::controllers::progress::ProgressStatus;
-use crate::AppState;
+use crate::BasicState;
 
 
 pub async fn update_or_insert(
-    state: &AppState,
+    state: &BasicState,
     user_id: u32,
     task_id: i32,
     status: ProgressStatus,
@@ -22,7 +22,7 @@ pub async fn update_or_insert(
 }
 
 pub async fn fetch_task_progress(
-    state: &AppState,
+    state: &BasicState,
     user_id: u32,
     task_id: i32,
 ) -> anyhow::Result<Progress> {

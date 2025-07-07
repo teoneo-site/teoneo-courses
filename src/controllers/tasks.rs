@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::prelude::FromRow;
 use utoipa::ToSchema;
 
-use crate::{db, AppState};
+use crate::{db, AppState, BasicState};
 
 use super::progress::{self, ProgressStatus};
 
@@ -127,7 +127,7 @@ pub struct PromptReply {
 }
 
 pub async fn get_tasks_for_module(
-    state: &AppState,
+    state: &BasicState,
     module_id: i32,
     user_id: Option<i32>,
 ) -> anyhow::Result<Vec<TaskShortInfo>> {
@@ -135,29 +135,29 @@ pub async fn get_tasks_for_module(
     Ok(tasks)
 }
 
-pub async fn get_tasks_total(state: &AppState, course_id: i32) -> anyhow::Result<i64> {
+pub async fn get_tasks_total(state: &BasicState, course_id: i32) -> anyhow::Result<i64> {
     let total = db::tasks::fetch_tasks_total(&state.pool, course_id).await?;
     Ok(total)
 }
 
-pub async fn get_tasks_passed(state: &AppState, course_id: i32, user_id: u32) -> anyhow::Result<i64> {
+pub async fn get_tasks_passed(state: &BasicState, course_id: i32, user_id: u32) -> anyhow::Result<i64> {
     let total = db::tasks::get_tasks_passed(&state.pool, course_id, user_id).await?;
     Ok(total)
 }
 
 
-pub async fn get_courses_started(state: &AppState, user_id: u32) -> anyhow::Result<Vec<i32>> {
+pub async fn get_courses_started(state: &BasicState, user_id: u32) -> anyhow::Result<Vec<i32>> {
     let courses_started = db::tasks::fetch_courses_started(&state.pool, user_id).await?;
     Ok(courses_started)
 }
 
-pub async fn get_courses_completed(state: &AppState, user_id: u32) -> anyhow::Result<Vec<i32>> {
+pub async fn get_courses_completed(state: &BasicState, user_id: u32) -> anyhow::Result<Vec<i32>> {
     let courses_completed = db::tasks::fetch_courses_completed(&state.pool, user_id).await?;
     Ok(courses_completed)
 }
 
 pub async fn get_task(
-    state: &AppState,
+    state: &BasicState,
     task_id: i32,
     user_id: Option<i32>,
 ) -> anyhow::Result<Task> {
@@ -166,7 +166,7 @@ pub async fn get_task(
 }
 
 pub async fn submit_quiz_task(
-    state: &AppState,
+    state: &BasicState,
     user_id: u32,
     task_id: i32,
     task_type: TaskType,
@@ -223,7 +223,7 @@ pub async fn process_prompt_task(
         // Get attemps, max attemps and additional_field
         let mut state = state;
 
-        let (question, add_prompt) = db::tasks::fetch_prompt_details(&state.pool, task_id) // Again, task_id is 100% Prompt type
+        let (question, add_prompt) = db::tasks::fetch_prompt_details(&state.basic.pool, task_id) // Again, task_id is 100% Prompt type
             .await.unwrap(); // This should not panic,only if Databse is broken, but then it will return 500 Server Internal Error on Panic
         let user_prompt = user_answers["data"]["user_prompt"]
             .as_str()
@@ -254,7 +254,7 @@ pub async fn process_prompt_task(
         let score: f32 = reply_struct.score;
 
         progress::update_or_insert_status(
-            &state,
+            &state.basic,
             user_id,
             task_id,
             if score < 0.4 {
