@@ -46,7 +46,7 @@ pub struct CertInfo {
 
 
 pub async fn get_certs(state: &BasicState, user_id: u32) -> anyhow::Result<Vec<CertInfo>> {
-    let completed_courses = vec![1i32]; // todo get back
+    let completed_courses = clients::tasks::get_completed_courses(state, user_id).await?;
     db::certs::add_certs(state, user_id, completed_courses).await?; // Shall not fail, since INSERT IGNORE fails silently
 
     let certs = db::certs::get_certs(state, user_id).await?;
