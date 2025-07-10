@@ -65,7 +65,7 @@ pub async fn create_cert(state: &BasicState, s3: minio::s3::Client, http_client:
     println!("{}", pdf_file_contens.len());
     // 34/certs/23 # user 34 cert_id = 23
     // Saved the file, no need for record in db, since you can easily construct `object` from user_id and cert
-    let object_str = format!("{}/certs/{}.pdf", auth_token.claims.id, cert_info.id);
+    let object_str = format!("{}/certs/{}-certificate.pdf", auth_token.claims.id, cert_info.course_title);
     let _ = s3.put_object(CERTS_BUCKET, object_str, Bytes::copy_from_slice(&pdf_file_contens).into()).send().await?;
 
     // Change status
@@ -76,7 +76,7 @@ pub async fn create_cert(state: &BasicState, s3: minio::s3::Client, http_client:
 pub async fn get_cert_file(state: &BasicState, s3: minio::s3::Client, cert_id: i32, user_id: u32) -> anyhow::Result<ObjectContent> {
     let cert_info = db::certs::get_cert(&state, cert_id).await?;
 
-    let object_str = format!("{}/certs/{}.pdf", user_id, cert_info.id);
+    let object_str = format!("{}/certs/{}-certificate.pdf", user_id, cert_info.course_title);
     let resp: minio::s3::response::GetObjectResponse = s3.get_object(CERTS_BUCKET, object_str).send().await?;
 
     Ok(resp.content)
