@@ -25,3 +25,5 @@ tracing = "0.1.41"
 utoipa = { version = "5.4.0", features = ["axum_extras", "chrono"] }
 utoipa-axum = "0.2.0"
 utoipa-swagger-ui = { version = "9.0.2", features = ["axum"] }
+minio = "0.3.0"
+reqwest = { version = "0.12.22", features = ["json"] }

@@ -37,7 +37,9 @@ impl utoipa::Modify for SecurityAddon {
         handlers::tasks::submit_task,
         handlers::tasks::task_progress,
         
-
+        handlers::certs::get_certs,
+        handlers::certs::create_cert,
+        handlers::certs::get_cert_file
 
     ),
     // components(

@@ -29,6 +29,8 @@ struct BasicState {
 struct AppState {
     basic: BasicState,
     ai: GigaClient,
+    s3_client: minio::s3::Client,
+    http_client: reqwest::Client
 }
 
 impl FromRef<AppState> for GigaClient {
@@ -36,6 +38,19 @@ impl FromRef<AppState> for GigaClient {
         state.ai.clone()
     }
 }
+
+impl FromRef<AppState> for minio::s3::Client {
+    fn from_ref(state: &AppState) -> Self {
+        state.s3_client.clone()
+    }
+}
+
+impl FromRef<AppState> for reqwest::Client {
+    fn from_ref(state: &AppState) -> Self {
+        state.http_client.clone()
+    }
+}
+
 
 impl FromRef<AppState> for BasicState {
     fn from_ref(input: &AppState) -> Self {
@@ -95,6 +110,22 @@ async fn main() {
     
     dotenv::dotenv().ok();
 
+    let static_prodiver = minio::s3::creds::StaticProvider::new("klewy", "dvfu1312", None);
+    let client = minio::s3::ClientBuilder::new(std::env::var("MINIO_URL").unwrap().parse().unwrap())
+        .provider(Some(Box::new(static_prodiver)))
+        .build()
+        .unwrap();
+
+    let reqwest_http_client = reqwest::ClientBuilder::new()
+        .user_agent("MyApp/1.0") // Always good to identify your app
+        .timeout(Duration::from_secs(10)) // Total request timeout
+        .connect_timeout(Duration::from_secs(5)) // Timeout for TCP handshake
+        .pool_idle_timeout(Duration::from_secs(30)) // Drop idle connections
+        .pool_max_idle_per_host(5) // Good default
+        .redirect(reqwest::redirect::Policy::limited(5)) // Follow up to 5 redirects
+        .build()
+        .expect("Failed to build HTTP client");
+
     let app_state = AppState {
         basic: BasicState { 
             pool: get_db_pool()
@@ -104,8 +135,9 @@ async fn main() {
         },
         ai: get_gigachat_client()
             .await
-            .expect("Could not connect to gigachat")
-        
+            .expect("Could not connect to gigachat"),
+        s3_client: client,
+        http_client: reqwest_http_client
     };
     let router = common::router::get_router(app_state);
 

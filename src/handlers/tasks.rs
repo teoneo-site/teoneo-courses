@@ -143,7 +143,7 @@ pub struct SubmitPayload {
 #[utoipa::path(
     post,
     description = "Отправляет задание на `асинхронную` проверку. Фетчить результат проверки нужно `/progress`. Принимает JSON: data: { answers: [0, 0, 1] } для match и quiz. data: { user_prompt: 'string' } для prompt",
-    path = "/courses/{course_id}/modules/{module_id}/tasks/{task_id}/submit",
+    path = "/courses/{course_id}/modules/{module_id}/tasks/{task_id}",
     params (
         ("Authorization" = String, Header, description = "JWT"),
         ("course_id" = i32, Path, description = "Айди курса"),

@@ -53,8 +53,8 @@ pub mod helpers {
 
 #[derive(Serialize, Deserialize, ToSchema)]
 pub struct ErrorResponse {
-    error_type: String,
-    error_msg: String,
+    pub error_type: String,
+    pub error_msg: String,
 }
 
 impl ErrorResponse {

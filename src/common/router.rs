@@ -39,7 +39,7 @@ fn courses_router() -> Router<AppState> {
         axum::routing::get(handlers::courses::get_user_courses_completed)
     )
     .route(
-        "/courses/{course_id}/favour",
+        "/courses/{course_id}/favourite",
         axum::routing::post(handlers::courses::add_course_to_favourite),
     )
     .route(
@@ -60,6 +60,23 @@ fn modules_router() -> Router<AppState> {
     )
 }
 
+fn certs_router() -> Router<AppState> {
+    Router::new()
+    .route(
+        "/certificates",
+        axum::routing::get(handlers::certs::get_certs)
+    )
+    .route(
+        "/certificates",
+        axum::routing::post(handlers::certs::create_cert)
+    )
+    .route(
+        "/certificates/{cert_id}",
+        axum::routing::get(handlers::certs::get_cert_file)
+    )
+}
+
+
 fn task_router() -> Router<AppState> {
     Router::new()
     .route(
@@ -71,7 +88,7 @@ fn task_router() -> Router<AppState> {
         axum::routing::get(handlers::tasks::get_task),
     )
     .route(
-        "/courses/{course_id}/modules/{module_id}/tasks/{task_id}/submit",
+        "/courses/{course_id}/modules/{module_id}/tasks/{task_id}",
         axum::routing::post(handlers::tasks::submit_task),
     )
     .route(
@@ -85,6 +102,7 @@ pub fn get_router(app_state: AppState) -> Router {
         .merge(courses_router())
         .merge(modules_router())
         .merge(task_router())
+        .merge(certs_router())
         .layer(CorsLayer::permissive().allow_origin(tower_http::cors::Any))
         .layer(CatchPanicLayer::custom(internal_server_error_handler))
         .layer(

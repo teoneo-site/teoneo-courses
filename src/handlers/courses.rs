@@ -126,7 +126,7 @@ pub async fn get_course_progress(
 #[utoipa::path(
     post,
     description = "Добавляет курс в избранное",
-    path = "/courses/{course_id}/favour",
+    path = "/courses/{course_id}/favourite",
     params (
         ("Authorization" = String, Header, description = "JWT"),
         ("course_id" = String, Path, description = "Айди курса")
