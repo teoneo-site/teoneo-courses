@@ -34,6 +34,7 @@ pub async fn add_certs(
 pub async fn get_certs(state: &BasicState, user_id: u32) -> anyhow::Result<Vec<CertInfo>> {
     let certs = sqlx::query_as!(CertInfo, "SELECT 
     user_certs.id,
+    user_certs.course_id,
     courses.title AS course_title,
     user_certs.status
         FROM user_certs
@@ -55,6 +56,7 @@ pub async fn set_cert_status(state: &BasicState, cert_id: i32, status: CertStatu
 pub async fn get_cert(state: &BasicState, cert_id: i32) -> anyhow::Result<CertInfo> {
     let cert = sqlx::query_as!(CertInfo, "SELECT 
     user_certs.id,
+    user_certs.course_id,
     courses.title AS course_title,
     user_certs.status
         FROM user_certs
