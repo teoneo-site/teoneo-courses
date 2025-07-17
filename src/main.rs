@@ -1,7 +1,9 @@
 use std::{any::Any, env, time::Duration};
 
 use axum::{
-    extract::FromRef, http::StatusCode, response::{IntoResponse, Response}
+    extract::FromRef,
+    http::StatusCode,
+    response::{IntoResponse, Response},
 };
 use gigalib::{
     controllers::client::{ClientBuilder, GigaClient},
@@ -11,18 +13,17 @@ use sqlx::{mysql::MySqlPoolOptions, MySql, Pool};
 
 use crate::common::error::{ErrorResponse, ErrorTypes};
 
+mod clients;
 mod common;
 mod controllers;
 mod db;
 mod handlers;
 mod swagger;
-mod clients;
 
 #[derive(Clone)]
 struct BasicState {
     pool: Pool<MySql>,
     redis: r2d2::Pool<redis::Client>,
-    
 }
 
 #[derive(Clone)]
@@ -30,7 +31,7 @@ struct AppState {
     basic: BasicState,
     ai: GigaClient,
     s3_client: minio::s3::Client,
-    http_client: reqwest::Client
+    http_client: reqwest::Client,
 }
 
 impl FromRef<AppState> for GigaClient {
@@ -51,7 +52,6 @@ impl FromRef<AppState> for reqwest::Client {
     }
 }
 
-
 impl FromRef<AppState> for BasicState {
     fn from_ref(input: &AppState) -> Self {
         input.basic.clone()
@@ -69,10 +69,7 @@ fn internal_server_error_handler(err: Box<dyn Any + Send + 'static>) -> Response
     println!("Internal server error catched: {}", details);
     (
         StatusCode::INTERNAL_SERVER_ERROR,
-        axum::Json(ErrorResponse::new(
-            ErrorTypes::InternalError,
-            &details,
-        )), // Should not panic, because struct is always valid for converting into JSON
+        axum::Json(ErrorResponse::new(ErrorTypes::InternalError, &details)), // Should not panic, because struct is always valid for converting into JSON
     )
         .into_response()
 }
@@ -102,19 +99,18 @@ async fn get_gigachat_client() -> anyhow::Result<GigaClient> {
     Ok(client)
 }
 
-
-
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt().pretty().init();
-    
+
     dotenv::dotenv().ok();
 
     let static_prodiver = minio::s3::creds::StaticProvider::new("klewy", "dvfu1312", None);
-    let client = minio::s3::ClientBuilder::new(std::env::var("MINIO_URL").unwrap().parse().unwrap())
-        .provider(Some(Box::new(static_prodiver)))
-        .build()
-        .unwrap();
+    let client =
+        minio::s3::ClientBuilder::new(std::env::var("MINIO_URL").unwrap().parse().unwrap())
+            .provider(Some(Box::new(static_prodiver)))
+            .build()
+            .unwrap();
 
     let reqwest_http_client = reqwest::ClientBuilder::new()
         .user_agent("MyApp/1.0") // Always good to identify your app
@@ -127,17 +123,17 @@ async fn main() {
         .expect("Failed to build HTTP client");
 
     let app_state = AppState {
-        basic: BasicState { 
+        basic: BasicState {
             pool: get_db_pool()
-            .await
-            .expect("Could not connect to the database"),
+                .await
+                .expect("Could not connect to the database"),
             redis: get_redis_pool().await.expect("Could not connect to redis"),
         },
         ai: get_gigachat_client()
             .await
             .expect("Could not connect to gigachat"),
         s3_client: client,
-        http_client: reqwest_http_client
+        http_client: reqwest_http_client,
     };
     let router = common::router::get_router(app_state);
 

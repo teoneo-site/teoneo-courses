@@ -4,7 +4,6 @@ use utoipa::ToSchema;
 
 use crate::{clients, db, BasicState};
 
-
 #[derive(Serialize, Deserialize, Clone, ToSchema, FromRow)]
 pub struct CourseInfo {
     pub id: i32,
@@ -14,6 +13,7 @@ pub struct CourseInfo {
     pub tags: String,
     pub picture_url: String,
     pub price: f64,
+    pub is_certificated: bool,
     pub has_course: bool,
     pub tasks_passed: Option<i64>,
     pub tasks_total: Option<i64>,
@@ -42,7 +42,6 @@ pub async fn add_course_to_favourite(
     db::courses::add_course_to_favourite(pool, user_id, course_id).await
 }
 
-
 pub async fn get_favourite_courses(pool: &BasicState, user_id: u32) -> anyhow::Result<Vec<i32>> {
     let ids = db::courses::get_favourite_courses(&pool, user_id).await?;
     Ok(ids)
@@ -53,12 +52,18 @@ pub async fn get_user_courses(state: &BasicState, user_id: u32) -> anyhow::Resul
     Ok(ids)
 }
 
-pub async fn get_user_courses_started(state: &BasicState, user_id: u32) -> anyhow::Result<Vec<i32>> {
+pub async fn get_user_courses_started(
+    state: &BasicState,
+    user_id: u32,
+) -> anyhow::Result<Vec<i32>> {
     let courses_started = clients::tasks::get_started_courses(state, user_id).await?;
     Ok(courses_started)
 }
 
-pub async fn get_user_courses_completed(state: &BasicState, user_id: u32) -> anyhow::Result<Vec<i32>> {
+pub async fn get_user_courses_completed(
+    state: &BasicState,
+    user_id: u32,
+) -> anyhow::Result<Vec<i32>> {
     let courses_started = clients::tasks::get_completed_courses(state, user_id).await?;
     Ok(courses_started)
 }
@@ -75,7 +80,9 @@ pub async fn get_courses_by_ids(
             if let Ok(_) = verify_ownership(state, user_id, course.id).await {
                 course.has_course = true;
 
-                if let Ok(passed) = clients::tasks::get_tasks_passed(state, course.id, user_id).await {
+                if let Ok(passed) =
+                    clients::tasks::get_tasks_passed(state, course.id, user_id).await
+                {
                     course.tasks_passed = Some(passed);
                 }
             }
@@ -88,7 +95,6 @@ pub async fn get_courses_by_ids(
     Ok(courses)
 }
 
-
 pub async fn get_course_progress(
     state: &BasicState,
     course_id: i32,
@@ -97,10 +103,10 @@ pub async fn get_course_progress(
     let tasks_total = clients::tasks::get_tasks_total(state, course_id).await?;
     let tasks_passed = clients::tasks::get_tasks_passed(state, course_id, user_id).await?;
 
-    Ok(CourseProgress { 
-        course_id: Some(course_id), 
-        tasks_passed: Some(tasks_passed), 
-        tasks_total: Some(tasks_total) 
+    Ok(CourseProgress {
+        course_id: Some(course_id),
+        tasks_passed: Some(tasks_passed),
+        tasks_total: Some(tasks_total),
     })
 }
 
@@ -128,7 +134,6 @@ pub async fn get_course(
 
     Ok(course)
 }
-
 
 pub async fn verify_ownership(
     state: &BasicState,
